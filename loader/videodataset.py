@@ -10,12 +10,16 @@ import ipdb
 import pickle
 from pycocotools import mask as maskUtils
 import lintel
+import cv2
 import time
 from torch.utils.data.dataloader import default_collate
 from random import shuffle
 from  abc import abstractmethod, ABCMeta
 import torch.nn.functional as F
 
+DEBUG = True
+# NOTE: lintel is not working so may use cv2 instead
+USE_LINTEL = False
 
 class VideoDataset(data.Dataset):
     __metaclass__ = ABCMeta
@@ -123,23 +127,27 @@ class VideoDataset(data.Dataset):
         return timesteps
 
     def extract_frames(self, video_file, timesteps):
+        if USE_LINTEL:
+          with open(video_file, 'rb') as f:
+              encoded_video = f.read()
+  
+              decoded_frames = lintel.loadvid_frame_nums(encoded_video,
+                                                         frame_nums=timesteps,
+                                                         width=self.real_w,
+                                                         height=self.real_h)
+          np_clip = np.frombuffer(decoded_frames, dtype=np.uint8)
+        else:
+          decoded_frames = self.cv2_load_vid_frames(video_file, timesteps)
+          np_clip = np.array(decoded_frames)
 
-        with open(video_file, 'rb') as f:
-            encoded_video = f.read()
-
-            decoded_frames = lintel.loadvid_frame_nums(encoded_video,
-                                                       frame_nums=timesteps,
-                                                       width=self.real_w,
-                                                       height=self.real_h)
-            try:
-                np_clip = np.frombuffer(decoded_frames, dtype=np.uint8)
-                np_clip = np.reshape(np_clip,
-                                     newshape=(len(timesteps), self.real_h, self.real_w, 3))
-                np_clip = np_clip.transpose([3, 0, 1, 2])
-                np_clip = np.float32(np_clip)
-            except Exception as e:
-                np_clip = decoded_frames
-                print("cannot decode the stream...")
+        try:
+            np_clip = np.reshape(np_clip,
+                                 newshape=(len(timesteps), self.real_h, self.real_w, 3))
+            np_clip = np_clip.transpose([3, 0, 1, 2])
+            np_clip = np.float32(np_clip)
+        except Exception as e:
+            np_clip = decoded_frames
+            print("cannot decode the stream...")
         return np_clip
 
     @staticmethod
@@ -402,6 +410,7 @@ class VideoDataset(data.Dataset):
                     "id": torch_id
                     }
         except Exception as e:
+            raise
             return None
 
     def __len__(self):
@@ -411,6 +420,18 @@ class VideoDataset(data.Dataset):
         fmt_str = 'Dataset ' + self.__class__.__name__ + '\n'
         fmt_str += '    Number of datapoints: {}\n'.format(self.__len__())
         return fmt_str
+
+    def cv2_load_vid_frames(self, vid, timesteps):
+      cap = cv2.VideoCapture(vid)
+
+      ret = True
+      frames = []
+      while ret:
+        ret, frame = cap.read()
+        frames += frame,
+      frames = frames[:-1]
+      frames = [frames[ts] for ts in timesteps]
+      return frames
 
 
 def my_collate(batch):

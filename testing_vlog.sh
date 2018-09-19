@@ -3,11 +3,23 @@
 # Envs
 # source activate pytorch-0.4.0
 
+orn_ckpt_dir=/vision2/u/bingbin/ORN/
+
+# full dir
+# VLOG masks
+VLOG=/vision2/u/cy3/data/VLOG
+# EPIC masks
+EPIC=/vision2/u/cy3/data/mask-AR
+
+# testing dir
+VLOG_masks="/sailhome/bingbin/object_level_visual_reasoning/data/vlog/masks/preds_100x100_50"
+VLOG_videos="/sailhome/bingbin/object_level_visual_reasoning/data/vlog/videos"
+
 # Pythonpath
 PYTHONPATH=.
 
-python main.py --root $VLOG \
---resume $1 \
+python main.py \
+--resume $orn_ckpt_dir \
 --blocks 2D_2D_2D_2.5D \
 --object-head 2D \
 --add-background \

@@ -134,7 +134,7 @@ def get_all_videos(dir, extension='mp4'):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Dataset preprocessing')
     parser.add_argument('--dir', metavar='DIR',
-                        default='../data/vlog/videos',
+                        default='./data/vlog/videos',
                         help='Path to the videos dir')
     parser.add_argument('--width', default=256, type=int,
                         metavar='W', help='Width of  of the output videos')

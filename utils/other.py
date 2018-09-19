@@ -9,6 +9,7 @@ import torch
 from utils.meter import *
 import shutil
 import math
+import cv2
 
 
 def load_pickle(file):
@@ -122,6 +123,10 @@ def load_from_dir(model, optimizer, options):
     if options['resume']:
         if os.path.isdir(options['resume']):
             ckpt_resume = os.path.join(options['resume'], 'model_best.pth.tar')
+            if not os.path.isfile(ckpt_resume):
+              untarred = ckpt_resume.replace('.tar', '')
+              if os.path.isfile(untarred):
+                ckpt_resume = untarred
             if os.path.isfile(ckpt_resume):
                 print("\n=> loading checkpoint '{}'".format(ckpt_resume))
                 checkpoint = torch.load(ckpt_resume, map_location=lambda storage, loc: storage)
@@ -272,3 +277,4 @@ def store_preds(preds, id, list_correct_preds, obj_id, dataset='vlog'):
 
 def sigmoid(x):
     return 1 / (1 + math.exp(-x))
+

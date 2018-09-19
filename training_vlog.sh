@@ -10,6 +10,9 @@ PYTHONPATH=.
 resume=/home/fbaradel/log_eccv18
 root=$VLOG
 
+resume=''
+root=''
+
 # Train the object head only with f=MLP
 epochs=10
 heads=object
