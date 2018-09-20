@@ -36,7 +36,6 @@ import matplotlib
 matplotlib.use('Agg')  # Use a non-interactive backend
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
-import ipdb
 
 plt.rcParams['pdf.fonttype'] = 42  # For editing in Adobe Illustrator
 

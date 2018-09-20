@@ -2,7 +2,7 @@ from model.backbone.imagenet_pretraining import load_pretrained_2D_weights
 from model.backbone.resnet.basicblock import BasicBlock2D, BasicBlock3D, BasicBlock2_1D
 from model.backbone.resnet.bottleneck import Bottleneck2D, Bottleneck3D, Bottleneck2_1D
 from model.backbone.resnet.resnet import ResNet
-import ipdb
+# import ipdb
 
 __all__ = [
     'resnet_two_heads',
@@ -83,7 +83,7 @@ def get_cnn_features(str_blocks='2D_2D_2D_2D', depth=18):
         elif str_block == '3D':
             list_block.append(block_3D)
         else:
-            ipdb.set_trace()
+            # ipdb.set_trace()
             raise NameError
 
     return list_block, list_layers

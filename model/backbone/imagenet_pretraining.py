@@ -1,6 +1,5 @@
 import torch.utils.model_zoo as model_zoo
 from model.backbone.resnet.resnet import model_urls
-import ipdb
 import torch
 
 

@@ -6,7 +6,7 @@ import os
 import random
 from PIL import Image
 import numpy as np
-import ipdb
+# import ipdb
 import pickle
 from pycocotools import mask as maskUtils
 import lintel
@@ -146,7 +146,8 @@ class VideoDataset(data.Dataset):
             np_clip = np_clip.transpose([3, 0, 1, 2])
             np_clip = np.float32(np_clip)
         except Exception as e:
-            np_clip = decoded_frames
+            np_clip = np.array(decoded_frames)
+            print(e)
             print("cannot decode the stream...")
         return np_clip
 
@@ -226,7 +227,7 @@ class VideoDataset(data.Dataset):
 
         except Exception as e:
             print("mask reading problem: ", e)
-            ipdb.set_trace()
+            # ipdb.set_trace()
             np_max_nb_obj[0] = 1.
 
             # Add the background mask
@@ -421,15 +422,26 @@ class VideoDataset(data.Dataset):
         fmt_str += '    Number of datapoints: {}\n'.format(self.__len__())
         return fmt_str
 
-    def cv2_load_vid_frames(self, vid, timesteps):
-      cap = cv2.VideoCapture(vid)
-
-      ret = True
+    @staticmethod
+    def cv2_load_vid_frames(vid, timesteps):
       frames = []
-      while ret:
-        ret, frame = cap.read()
-        frames += frame,
-      frames = frames[:-1]
+
+      if type(vid) == str:
+        # for VLOG: vid is a mp4 file
+        cap = cv2.VideoCapture(vid)
+  
+        ret = True
+        while ret:
+          ret, frame = cap.read()
+          frames += frame,
+        frames = frames[:-1]
+      else:
+        # for EPIC kitchen: vid is a list of frames
+        for frame_path in vid:
+          # TODO: check whether imread gives the correct dimension order
+          frame = cv2.imread(frame_path)
+          frames += cv2.resize(frame, (256, 256)),
+
       frames = [frames[ts] for ts in timesteps]
       return frames
 

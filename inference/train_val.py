@@ -1,7 +1,7 @@
 from utils.meter import *
 import time
 import torch
-import ipdb
+# import ipdb
 import sys
 import torch.nn as nn
 from utils.meter import *
@@ -111,7 +111,11 @@ def train(epoch, engine, options, cuda=False):
 
     end = time.time()
     print("")
+    print('#train_data_loader:', len(data_loader))
+    print('print_freq:', options['print_freq'])
     for i, input in enumerate(data_loader):
+        if i == 1:
+          print('first iteration passed')
         # measure data loading time
         data_time.update(time.time() - end)
 

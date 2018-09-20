@@ -12,7 +12,7 @@ import torch.utils.data
 import torch.utils.data.distributed
 from utils.meter import *
 from inference.train_val import *
-import ipdb
+# import ipdb
 from model import models
 from utils.other import *
 
@@ -27,6 +27,7 @@ def main(options):
                                                                            print_number(len(val_dataset))))
 
     # Model
+    tmp = models.__dict__[options['arch']]
     model = models.__dict__[options['arch']](num_classes=train_dataset.nb_classes,
                                              size_fm_2nd_head=train_dataset.h_mask,
                                              options=options)
@@ -101,6 +102,7 @@ def main(options):
                 'state_dict': model.state_dict(),
                 'best_metric_val': best_metric_val,
                 'optimizer': optimizer.state_dict(),
-            }, is_best, options['resume'])
+            }, is_best, options['resume'],
+            filename='ckpt_{:s}_{:d}.pth'.format(options['dataset'], epoch))
 
     return None

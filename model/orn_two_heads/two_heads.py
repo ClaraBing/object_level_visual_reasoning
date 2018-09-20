@@ -14,7 +14,6 @@ from model.backbone.resnet.basicblock import BasicBlock2D, BasicBlock3D, BasicBl
 from model.orn_two_heads.aggregation_relations import AggregationRelations
 import math
 from model.orn_two_heads.orn import ObjectRelationNetwork
-import ipdb
 
 __all__ = [
     'orn_two_heads',
@@ -111,6 +110,7 @@ class TwoHeads(nn.Module):
         self.fc_classifier_object = nn.Linear(self.size_relation_features, self.num_classes)
         self.fc_classifier_context = nn.Linear(self.size_cnn_features, self.num_classes)
 
+
     def get_objects_features(self, fm, masks):
         # Upsample the features maps to get better precision!
         # fm_old = fm
@@ -189,8 +189,6 @@ class TwoHeads(nn.Module):
                         relations[b, obj_id_k_1, obj_id_k] = inter  # matrix but we fill only half of it (the triangle)
                     except:
                         pass
-                        # import ipdb
-                        # ipdb.set_trace()
         return relations  # (B, 81, 81)
 
     def retrieve_relations_temporal(self, relational_reasoning_vector_COCO, obj_id):
@@ -217,9 +215,7 @@ class TwoHeads(nn.Module):
                         relations[
                             b, t, obj_id_k_1, obj_id_k] = inter  # matrix but we fill only half of it (the triangle)
                     except:
-                        import ipdb
                         pass
-                        # ipdb.set_trace()
         return relations  # (B, T-1, 81, 81)
 
     @staticmethod
@@ -302,6 +298,8 @@ class TwoHeads(nn.Module):
             return self.fc_classifier_object(object_representation)
 
     def forward(self, x):
+        print('Two-heads forward')
+
         """Forward pass from a tensor of size (B,C,T,W,H)"""
         clip, masks, obj_id, bbox, max_nb_obj = x['clip'], x['mask'], x['obj_id'], x['obj_bbox'], x['max_nb_obj']
 

@@ -1,6 +1,4 @@
 import torch.nn as nn
-import ipdb
-
 
 class Bottleneck(nn.Module):
     expansion = 4

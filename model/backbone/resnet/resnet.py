@@ -3,7 +3,6 @@ import math
 from model.backbone.resnet.basicblock import BasicBlock2D
 from model.backbone.resnet.bottleneck import Bottleneck2D
 from utils.other import transform_input
-import ipdb
 import torch
 from utils.meter import *
 
@@ -106,6 +105,7 @@ class ResNet(nn.Module):
             elif isinstance(m, nn.BatchNorm3d) or isinstance(m, nn.BatchNorm2d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
+
 
     def _get_stride_2nd_head(self):
         if self.size_fm_2nd_head == 7:
@@ -232,11 +232,13 @@ class ResNet(nn.Module):
         # Object head
         if 'object' in heads_type:
             fm_objects = x
+            print('object: fm_objects (in):', fm_objects.shape)
             for i in range(len(self.list_layers_bis)):
                 layer = self.list_layers_bis[i]
                 fm_objects = transform_input(fm_objects, layer[0].input_dim, T=T)
                 fm_objects = layer(fm_objects)
             fm_objects = transform_input(fm_objects, out_dim, T=T)
+            print('object: fm_objects (out):', fm_objects.shape)
         else:
             fm_objects = None
 
@@ -254,6 +256,8 @@ class ResNet(nn.Module):
         return fm_context, fm_objects
 
     def forward(self, x):
+        print('ResNet forward')
+
         x = x['clip']
 
         x = self.get_features_map(x, num=self.num_final_fm)
@@ -268,7 +272,7 @@ class ResNet(nn.Module):
             x = self.avgpool_space(x)
             x = x.view(x.size(0), x.size(1), x.size(2))  # (B,D,T)
             x = x.transpose(1, 2)  # (B,T,D)
-            ipdb.set_trace()
+            # ipdb.set_trace()
             x, _ = self.rnn(x)  # (B,T,D/2)
             x = torch.mean(x, 1)  # (B,D/2)
 

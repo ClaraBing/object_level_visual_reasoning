@@ -1,10 +1,10 @@
 import pickle
 from loader.vlog import VLOG
+from loader.epic import EPIC
 import torch
 from loader.videodataset import my_collate
 from torch.nn import Module
 import torch.nn as nn
-import ipdb
 import torch
 from utils.meter import *
 import shutil
@@ -32,6 +32,11 @@ def get_datasets_and_dataloaders(options, cuda=False):
             nb_crops = options['nb_crops']
         else:
             raise NameError
+    elif options['dataset'] == 'epic':
+        VideoDataset = EPIC
+        train_set_name = 'train'
+        val_set_name = 'val'
+        nb_crops = options['nb_crops']
     else:
         raise NameError
 
@@ -69,6 +74,10 @@ def get_loss_and_metric(options):
         # Metric
         metric = AveragePrecisionMeter
         # Loss
+        loss = CriterionLinearCombination(['bce', 'ce'], [15.0, 1.0])
+    elif options['dataset'] == 'epic':
+       # TODO: use better metric/loss
+        metric = AveragePrecisionMeter
         loss = CriterionLinearCombination(['bce', 'ce'], [15.0, 1.0])
     else:
         raise NameError

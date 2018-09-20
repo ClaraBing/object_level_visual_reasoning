@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import random
 from model.orn_two_heads.encoder import EncoderMLP
-import ipdb
 
 
 class ObjectRelationNetwork(nn.Module):
@@ -30,6 +29,10 @@ class ObjectRelationNetwork(nn.Module):
             list_input_mlp.append(O_1_k_input_relation)
         # Cat
         input_mlp = torch.cat(list_input_mlp, 1)  # (B, K^2, 2*|O|)
+        print('in create_inter_object_cat:')
+        print('O_1:', O_1.shape)
+        print('O_2:', O_2.shape)
+        print('input_mlp:', input_mlp.shape)
         return input_mlp
 
     @staticmethod
@@ -98,6 +101,7 @@ class ObjectRelationNetwork(nn.Module):
 
         # Number of timesteps
         B, T, K, _ = sets_of_objects.size()
+        print('ORN forward: sets_of_objects:', sets_of_objects.shape)
 
         list_e, list_is_obj = [], []  # list of the global interaction between two frames
         for t in range(1, T):

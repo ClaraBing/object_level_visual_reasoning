@@ -3,7 +3,6 @@ import torch.nn as nn
 from torch.autograd import Variable
 import torch.nn.functional as F
 import random
-import ipdb
 
 class AggregationRelations(nn.Module):
     def __init__(self):

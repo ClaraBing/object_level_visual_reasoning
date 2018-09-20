@@ -6,7 +6,7 @@ import os
 import random
 from PIL import Image
 import numpy as np
-import ipdb
+# import ipdb
 import pickle
 from pycocotools import mask as maskUtils
 import lintel
@@ -101,6 +101,7 @@ class VLOG(VideoDataset):
 
     def get_mask_file(self, id):
         # Get the approriate masks
+        print('vlog: get_mask_file: id:', id)
         mask_fn = os.path.join(self.mask_dir_full, id, 'clip.pkl')
 
         return mask_fn
