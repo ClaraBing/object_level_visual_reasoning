@@ -29,10 +29,10 @@ class ObjectRelationNetwork(nn.Module):
             list_input_mlp.append(O_1_k_input_relation)
         # Cat
         input_mlp = torch.cat(list_input_mlp, 1)  # (B, K^2, 2*|O|)
-        print('in create_inter_object_cat:')
-        print('O_1:', O_1.shape)
-        print('O_2:', O_2.shape)
-        print('input_mlp:', input_mlp.shape)
+        # print('in two_heads_orn/orn.py: create_inter_object_cat:')
+        # print('O_1:', O_1.shape)
+        # print('O_2:', O_2.shape)
+        # print('input_mlp:', input_mlp.shape)
         return input_mlp
 
     @staticmethod

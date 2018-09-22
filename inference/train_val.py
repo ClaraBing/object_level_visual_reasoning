@@ -10,11 +10,11 @@ from utils.other import *
 import pandas
 
 
-def make_variable_all_input(dict_input, cuda=False):
+def make_variable_all_input(dict_input, device='cpu'):
     dict_input_var = {}
     for k, v in dict_input.items():
         var = torch.autograd.Variable(v)
-        dict_input_var[k] = var.cuda() if cuda else var
+        dict_input_var[k] = var.to(device)
     return dict_input_var
 
 
@@ -38,7 +38,7 @@ def get_obj_id_for_loss(input_var, is_Variable=True, j=0):
     return obj_id
 
 
-def forward_backward(model, input_var, criterion, optimizer=None, cuda=False,
+def forward_backward(model, input_var, criterion, optimizer=None, device='cpu',
                      j=1):
     # compute output
     output = model(input_var)
@@ -50,7 +50,7 @@ def forward_backward(model, input_var, criterion, optimizer=None, cuda=False,
     output = output if isinstance(output, tuple) else (output, None)
 
     # compute loss
-    loss = criterion(output, [input_var['target'], obj_id], cuda)
+    loss = criterion(output, [input_var['target'], obj_id], device) # TODO: check criterion
 
     # backward
     if optimizer is not None:
@@ -93,7 +93,7 @@ def take_clip_j(input_var, j):
     return input_var_j
 
 
-def train(epoch, engine, options, cuda=False):
+def train(epoch, engine, options, device='cpu'):
     # Timer
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -120,10 +120,10 @@ def train(epoch, engine, options, cuda=False):
         data_time.update(time.time() - end)
 
         # Make Variables
-        input_var = make_variable_all_input(input, cuda=cuda)
+        input_var = make_variable_all_input(input, device=device)
 
         # compute output
-        output, loss = forward_backward(model, input_var, criterion, optimizer, cuda)
+        output, loss = forward_backward(model, input_var, criterion, optimizer, device)
 
         # measure elapsed time
         batch_time.update(time.time() - end)
@@ -149,7 +149,7 @@ def train(epoch, engine, options, cuda=False):
     return losses.avg, metric_avg
 
 
-def validate(epoch, engine, options, cuda=False):
+def validate(epoch, engine, options, device='cpu'):
     # Timer
     batch_time = AverageMeter()
     losses = AverageMeter()
@@ -176,7 +176,7 @@ def validate(epoch, engine, options, cuda=False):
             data_time.update(time.time() - end)
 
             # Make Variables
-            input_var = make_variable_all_input(input, cuda=cuda)
+            input_var = make_variable_all_input(input, device=device)
 
             output_aggreg, loss_aggreg, obj_id_aggreg = None, None, None
             for j in range(nb_crops):
@@ -185,7 +185,7 @@ def validate(epoch, engine, options, cuda=False):
                 obj_id = input_var_j['obj_id']
 
                 # compute output
-                output, loss = forward_backward(model, input_var_j, criterion, None, cuda)
+                output, loss = forward_backward(model, input_var_j, criterion, None, device)
                 # ipdb.set_trace()
 
                 # aggreg by summing

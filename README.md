@@ -7,6 +7,11 @@ Links: [Project page](https://fabienbaradel.github.io/eccv18_object_level_visual
 
 <img src="img/teaser_carrots.png" width="800"/>
 
+## TODO
+* meta files:
+  * `manifest.txt`: a list of all video folders; may not be needed if 
+  * `splitId.txt`: correpsonding to `manifest.txt`; e.g. split ids for VLOG: test:0 / val:3 / train:1+2
+
 ## Code
 We release code for training and testing our implementation.
 We encourage you to follow the steps below:

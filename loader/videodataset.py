@@ -27,7 +27,7 @@ class VideoDataset(data.Dataset):
     Generic loader for videos dataset
     """
 
-    def __init__(self, options, nb_classes=30,
+    def __init__(self, options,
                  dataset='train',
                  nb_crops=1,
                  #
@@ -46,7 +46,7 @@ class VideoDataset(data.Dataset):
         self.h = h
         self.t = options['t']
         self.video_dir = video_dir
-        self.nb_classes = nb_classes
+        self.nb_classes = options['nb_classes']
         self.usual_transform = usual_transform
         self.nb_obj_max_t = nb_obj_t_max
         self.mask_confidence = mask_confidence
@@ -435,14 +435,14 @@ class VideoDataset(data.Dataset):
           ret, frame = cap.read()
           frames += frame,
         frames = frames[:-1]
+        frames = [frames[ts] for ts in timesteps]
       else:
         # for EPIC kitchen: vid is a list of frames
+        vid = [vid[ts] for ts in timesteps]
         for frame_path in vid:
           # TODO: check whether imread gives the correct dimension order
           frame = cv2.imread(frame_path)
           frames += cv2.resize(frame, (256, 256)),
-
-      frames = [frames[ts] for ts in timesteps]
       return frames
 
 

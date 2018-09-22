@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 
 class Bottleneck(nn.Module):
@@ -21,6 +22,10 @@ class Bottleneck(nn.Module):
     def forward(self, x):
         residual = x
 
+        # print('Bottleneck devices:')
+        # print('current device:', torch.cuda.current_device())
+        # print('x:', x.device)
+        # print('self.conv1:', torch.cuda.device_of(self.conv1))
         out = self.conv1(x)
         out = self.bn1(out)
         out = self.relu(out)

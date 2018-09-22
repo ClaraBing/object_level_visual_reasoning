@@ -18,7 +18,7 @@ def load_pickle(file):
     return df
 
 
-def get_datasets_and_dataloaders(options, cuda=False):
+def get_datasets_and_dataloaders(options, device='cpu'):
     # Choice of Dataset
     if options['dataset'] == 'vlog':
         VideoDataset = VLOG
@@ -32,11 +32,13 @@ def get_datasets_and_dataloaders(options, cuda=False):
             nb_crops = options['nb_crops']
         else:
             raise NameError
+        options['nb_classes'] = 30
     elif options['dataset'] == 'epic':
         VideoDataset = EPIC
         train_set_name = 'train'
         val_set_name = 'val'
         nb_crops = options['nb_crops']
+        options['nb_classes'] = 125
     else:
         raise NameError
 
@@ -57,13 +59,13 @@ def get_datasets_and_dataloaders(options, cuda=False):
                                                batch_size=options['batch_size'],
                                                shuffle=True,
                                                num_workers=options['workers'],
-                                               pin_memory=cuda,
+                                               pin_memory=device!='cpu',
                                                collate_fn=my_collate)
     val_loader = torch.utils.data.DataLoader(val_dataset,
                                              batch_size=options['batch_size'],
                                              shuffle=False,
                                              num_workers=options['workers'],
-                                             pin_memory=cuda,
+                                             pin_memory=device!='cpu',
                                              collate_fn=my_collate)
 
     return train_dataset, val_dataset, train_loader, val_loader
@@ -102,7 +104,7 @@ class CriterionLinearCombination(Module):
             # Weight
             self.list_weights.append(list_weights[i])
 
-    def forward(self, list_input, list_target, cuda=False):
+    def forward(self, list_input, list_target, device='cpu'):
         assert len(list_input) == len(list_target)
         # ipdb.set_trace()
         loss = 0.0
@@ -116,7 +118,7 @@ class CriterionLinearCombination(Module):
                 elif isinstance(criterion_i, nn.BCEWithLogitsLoss):
                     target_i = target_i.type(torch.FloatTensor)
 
-                target_i = target_i.cuda() if cuda else target_i
+                target_i = target_i.to(device)
 
                 # Compute the loss and add
                 input_i = input_i.view(-1, input_i.size(-1))

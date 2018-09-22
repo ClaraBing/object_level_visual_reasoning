@@ -232,13 +232,13 @@ class ResNet(nn.Module):
         # Object head
         if 'object' in heads_type:
             fm_objects = x
-            print('object: fm_objects (in):', fm_objects.shape)
+            # print('object: fm_objects (in):', fm_objects.shape)
             for i in range(len(self.list_layers_bis)):
                 layer = self.list_layers_bis[i]
                 fm_objects = transform_input(fm_objects, layer[0].input_dim, T=T)
                 fm_objects = layer(fm_objects)
             fm_objects = transform_input(fm_objects, out_dim, T=T)
-            print('object: fm_objects (out):', fm_objects.shape)
+            # print('object: fm_objects (out):', fm_objects.shape)
         else:
             fm_objects = None
 

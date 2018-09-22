@@ -19,10 +19,10 @@ from utils.other import *
 
 def main(options):
     # CUDA
-    cuda = torch.cuda.is_available()
+    device = options['device']
 
     # Dataset
-    train_dataset, val_dataset, train_loader, val_loader = get_datasets_and_dataloaders(options, cuda=cuda)
+    train_dataset, val_dataset, train_loader, val_loader = get_datasets_and_dataloaders(options, device=options['device'])
     print('\n*** Train set of size {}  -  Val set of size {} ***\n'.format(print_number(len(train_dataset)),
                                                                            print_number(len(val_dataset))))
 
@@ -31,7 +31,7 @@ def main(options):
     model = models.__dict__[options['arch']](num_classes=train_dataset.nb_classes,
                                              size_fm_2nd_head=train_dataset.h_mask,
                                              options=options)
-    model = model.cuda() if cuda else model
+    model = model.to(device)
     model = torch.nn.DataParallel(model)
 
     # Trainable params
@@ -64,7 +64,7 @@ def main(options):
     # Training/Val or Testing #
     if options['evaluate']:
         # Val
-        loss_val, metric_val, per_class_metric_val, df_good, df_failure, df_objects = validate(epoch, engine, options, cuda=cuda)
+        loss_val, metric_val, per_class_metric_val, df_good, df_failure, df_objects = validate(epoch, engine, options, device=device)
         # Write into log
         write_to_log(val_dataset.dataset, options['resume'], epoch, [loss_val, metric_val], per_class_metric_val)
         # Save good and failures and object presence
@@ -78,7 +78,7 @@ def main(options):
         best_metric_val = -0.1
         for epoch in range(1, options['epochs'] + 1):
             # train one epoch
-            loss_train, metric_train = train(epoch, engine, options, cuda=cuda)
+            loss_train, metric_train = train(epoch, engine, options, device=device)
 
             # write into log
             write_to_log(train_dataset.dataset, options['resume'], epoch, [loss_train, loss_train], None)
@@ -86,7 +86,7 @@ def main(options):
             # get the val metric
             if options['train_set'] == 'train':
                 # Val
-                loss_val, metric_val, per_class_metric_val, *_ = validate(epoch, engine, options, cuda=cuda)
+                loss_val, metric_val, per_class_metric_val, *_ = validate(epoch, engine, options, device=device)
                 # Write into log
                 write_to_log(val_dataset.dataset, options['resume'], epoch, [loss_val, metric_val],
                              per_class_metric_val)

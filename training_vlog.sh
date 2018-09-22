@@ -7,17 +7,13 @@
 PYTHONPATH=.
 
 # Settings
-resume=/home/fbaradel/log_eccv18
-root=$VLOG
-
-resume=''
-root=''
+resume=/vision2/u/bingbin/ORN/
+# root=$VLOG
 
 # Train the object head only with f=MLP
 epochs=10
 heads=object
 python main.py --resume $resume \
---root $root \
 --blocks 2D_2D_2D_2.5D \
 --object-head 2D \
 --add-background \
@@ -36,11 +32,12 @@ python main.py --resume $resume \
 --mask-confidence 0.5 \
 -j 4
 
+exit
+
 # Train the two heads with f=RNN and pooling is avg for context head
 epochs=10
 heads=object+context
 python main.py --resume $resume \
---root $root \
 --blocks 2D_2D_2D_2.5D \
 --object-head 2D \
 --add-background \
@@ -62,7 +59,6 @@ python main.py --resume $resume \
 epochs=10
 heads=object+context
 python main.py --resume $resume \
---root $root \
 --blocks 2D_2D_2D_2.5D \
 --object-head 2D \
 --add-background \

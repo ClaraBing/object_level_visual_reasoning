@@ -11,6 +11,8 @@ if __name__ == '__main__':
 
     # Parser
     parser = argparse.ArgumentParser(description='Pytorch implementation: Object level visual reasoning in videos')
+    parser.add_argument('--device', default='cuda:0',
+                        help="A string specifying the device on which models and data reside. 'cpu' or 'cuda:x'")
     parser.add_argument('--arch', '-a', metavar='ARCH',
                         default='orn_two_heads',
                         choices=model_names,
@@ -34,6 +36,7 @@ if __name__ == '__main__':
                         metavar='T', help='number of timesteps extracted from a video')
     parser.add_argument('--epochs', type=int, default=10, metavar='N',
                         help='number of epochs to train')
+    parser.add_argument('--nb-classes', type=int, default=125, help='number of classes. 125 for EPIC.')
     parser.add_argument('--nb-crops', type=int, default=10, metavar='N',
                         help='number of crops while testing')
     parser.add_argument('--lr', type=float, default=0.0001, metavar='LR',
