@@ -101,7 +101,6 @@ class ObjectRelationNetwork(nn.Module):
 
         # Number of timesteps
         B, T, K, _ = sets_of_objects.size()
-        print('ORN forward: sets_of_objects:', sets_of_objects.shape)
 
         list_e, list_is_obj = [], []  # list of the global interaction between two frames
         for t in range(1, T):

@@ -47,6 +47,7 @@ class VideoDataset(data.Dataset):
         self.t = options['t']
         self.video_dir = video_dir
         self.nb_classes = options['nb_classes']
+        self.n_obj_cls = options['nb_obj_classes']
         self.usual_transform = usual_transform
         self.nb_obj_max_t = nb_obj_t_max
         self.mask_confidence = mask_confidence
@@ -163,7 +164,7 @@ class VideoDataset(data.Dataset):
         # update the timesteps dpending on the starting point
         timesteps = [t + start for t in timesteps]
 
-        np_obj_id = np.zeros((T, self.nb_obj_max_t, 81)).astype(np.float32)
+        np_obj_id = np.zeros((T, self.nb_obj_max_t, self.n_obj_cls)).astype(np.float32)
         np_bbox = np.zeros((T, self.nb_obj_max_t, 4)).astype(np.float32)
         np_masks = np.zeros((T, self.nb_obj_max_t, self.real_mask_h, self.real_mask_w)).astype(np.float32)
         np_max_nb_obj = np.asarray([self.nb_obj_max_t]).reshape((1,))
@@ -341,7 +342,8 @@ class VideoDataset(data.Dataset):
          np_obj_id_union, np_max_nb_obj_union) = self.retrieve_clip_and_masks(id,
                                                                               timesteps_union,
                                                                               length,
-                                                                              start)
+                                                                              start,
+                                                                              )
 
         # Loop and retreieve the data per clip
         list_np_clip, list_np_masks, list_np_bbox, list_np_obj_id = [], [], [], []

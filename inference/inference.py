@@ -103,6 +103,6 @@ def main(options):
                 'best_metric_val': best_metric_val,
                 'optimizer': optimizer.state_dict(),
             }, is_best, options['resume'],
-            filename='ckpt_{:s}_{:d}.pth'.format(options['dataset'], epoch))
+            filename='ckpt_{:s}_{:d}_gcn{}.pth'.format(options['dataset'], epoch, options['use_gcn']))
 
     return None

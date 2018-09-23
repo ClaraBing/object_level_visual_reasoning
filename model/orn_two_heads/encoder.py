@@ -36,6 +36,9 @@ class EncoderMLP(nn.Module):
             x = x.contiguous()
             x_input = x.view(B, T, K, W * H)
         else:
+            print('Exception:')
+            print('size_x:', size_x)
+            print('self.input_size:', self.input_size)
             raise Exception
 
         # Encoder

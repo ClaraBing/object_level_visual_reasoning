@@ -21,12 +21,13 @@ __all__ = [
 
 
 class TwoHeads(nn.Module):
-    def __init__(self, num_classes=174, cnn=None,
+    def __init__(self, num_classes=174, n_objs=353, cnn=None, use_gcn=False,
                  features_size=512, time=8, mask_size=28, size_RN=256, nb_head=2,
                  logits_type='object', f_orn=True,
                  size_2nd_head=14,
                  **kwargs):
         super(TwoHeads, self).__init__()
+        self.use_gcn = use_gcn
         # Basic settings
         self.num_classes = num_classes
         self.time = time
@@ -67,7 +68,7 @@ class TwoHeads(nn.Module):
         # Prediction of the class of each detected COCO objects (MLP from the pooled features)
         self.COCO_Object_Class_from_Features = Classifier(
             size_input=self.size_cnn_features,
-            size_output=81)
+            size_output=n_objs)
 
         # Embedding of the binary mask by AutoEncoder
         # Goal -> find the latent space of the shape and location of the objects
@@ -78,12 +79,15 @@ class TwoHeads(nn.Module):
         # Embedding of the object id
         # Goal -> find the latent space of object id better than just a one hot vector
         self.size_obj_embedding = 100
-        input_size = 81
+        input_size = n_objs
         self.Encoder_COCO_Obj_Class = EncoderMLP(input_size=input_size,
                                                  list_hidden_size=[self.size_obj_embedding, self.size_obj_embedding])
 
         # Object Relational Network (ORN) between coco or pixel objects
         size_object = self.size_COCO_object_features + self.size_mask_embedding + self.size_obj_embedding
+        print('Two heads: size_object={} / size_COCO_obj={} / size_mask={} / size_obj_embed={}'.format(
+            size_object, self.size_COCO_object_features, self.size_mask_embedding, self.size_obj_embedding
+              ))
 
         # ORN
         list_size_hidden_layers = [self.size_RN, self.size_RN, self.size_RN]
@@ -165,11 +169,11 @@ class TwoHeads(nn.Module):
 
         return pixel_features
 
-    def retrieve_relations(self, relational_reasoning_vector_COCO, obj_id):
+    def retrieve_relations(self, relational_reasoning_vector_COCO, obj_id, n_obj_cls):
         B, T, K, C = obj_id.size()
         B, T_1, K2, D = relational_reasoning_vector_COCO.size()
 
-        relations = np.zeros((B, 81, 81))
+        relations = np.zeros((B, n_obj_cls, n_obj_cls))
         for b in range(B):
             for t in range(T_1):
                 for k2 in range(K2):
@@ -189,13 +193,13 @@ class TwoHeads(nn.Module):
                         relations[b, obj_id_k_1, obj_id_k] = inter  # matrix but we fill only half of it (the triangle)
                     except:
                         pass
-        return relations  # (B, 81, 81)
+        return relations  # (B, n_obj_cls, n_obj_cls)
 
     def retrieve_relations_temporal(self, relational_reasoning_vector_COCO, obj_id):
         B, T, K, C = obj_id.size()
         B, T_1, K2, D = relational_reasoning_vector_COCO.size()
 
-        relations = np.zeros((B, T_1, 81, 81))
+        relations = np.zeros((B, T_1, n_obj_cls, n_obj_cls))
         for b in range(B):
             for t in range(T_1):
                 for k2 in range(K2):
@@ -216,7 +220,7 @@ class TwoHeads(nn.Module):
                             b, t, obj_id_k_1, obj_id_k] = inter  # matrix but we fill only half of it (the triangle)
                     except:
                         pass
-        return relations  # (B, T-1, 81, 81)
+        return relations  # (B, T-1, n_obj_cls, n_obj_cls)
 
     @staticmethod
     def get_id_object(one_hot):
@@ -238,6 +242,9 @@ class TwoHeads(nn.Module):
 
         # Classify each detected objects to make sure we extract good object descriptors
         preds_class_detected_objects = self.COCO_Object_Class_from_Features(objects_features)
+
+        if self.use_gcn:
+          object_features = self.gcn(object_features, 'obj', preds_class_detected_objects)
 
         # Reconstruct the binary masks to find the correct embedding (i.e. shape and location of the detected objects)
         embedding_objects_location = self.Encoder_Binary_Mask(masks)
@@ -298,8 +305,6 @@ class TwoHeads(nn.Module):
             return self.fc_classifier_object(object_representation)
 
     def forward(self, x):
-        print('Two-heads forward')
-
         """Forward pass from a tensor of size (B,C,T,W,H)"""
         clip, masks, obj_id, bbox, max_nb_obj = x['clip'], x['mask'], x['obj_id'], x['obj_bbox'], x['max_nb_obj']
 
@@ -351,12 +356,16 @@ def orn_two_heads(options, **kwargs):
     cnn = resnet_two_heads(options, **kwargs)
 
     # Features dim
-    features_size = 2048 if depth > 34 else 512
-    size_RN = 512 if depth > 34 else 256
+    # features_size = 2048 if depth > 34 else 512
+    # size_RN = 512 if depth > 34 else 256
+    features_size = 512 if options['use_gcn'] else 2048
+    size_RN = 512
 
     # Model
     model = TwoHeads(
+        n_objs=options['nb_obj_classes'],
         cnn=cnn,
+        use_gcn=options['use_gcn'],
         features_size=features_size,
         size_RN=size_RN,
         logits_type=heads,
