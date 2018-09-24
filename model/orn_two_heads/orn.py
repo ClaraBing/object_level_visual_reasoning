@@ -96,12 +96,15 @@ class ObjectRelationNetwork(nn.Module):
         else:
             # Stack
             all_e_inter = torch.stack(list_e_inter, 1)
+            print('all_e_inter:', all_e_inter.shape)
             pooler = nn.AvgPool3d((all_e_inter.size(1), 1, 1))  # or nn.MaxPool3d((all_e_inter.size(1), 1, 1))
             all_e_inter = pooler(all_e_inter)
+            print('all_e_inter:(after pooler)', all_e_inter.shape)
             B, _, T_prim, D = all_e_inter.size()
             all_e_inter = all_e_inter.view(B, T_prim, D)
             is_objects_inter = torch.stack(list_is_object_inter, 1)
             is_objects_inter = torch.clamp(torch.sum(is_objects_inter, 1), 0, 1)
+            print('is_objects_inter:', is_objects_inter.shape)
             return all_e_inter, is_objects_inter
 
     def forward(self, sets_of_objects, D, sampling=False):
@@ -123,6 +126,11 @@ class ObjectRelationNetwork(nn.Module):
 
         # Stack
         all_e = torch.stack(list_e, 1)
+        #print('two_heads forward:')
+        #print('sets_of_objects:', sets_of_objects.shape)
+        #print('all_e:', all_e.shape)
         all_is_obj = torch.stack(list_is_obj, 1)
+        # print('all_is_obj:', all_is_obj.shape)
+        # exit()
 
         return all_e, all_is_obj

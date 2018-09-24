@@ -120,7 +120,7 @@ class TwoHeads(nn.Module):
 
         ## Final classification
         self.fc_classifier_object = nn.Linear(self.size_relation_features, self.num_classes)
-        self.fc_classifier_context = nn.Linear(self.size_cnn_features, self.num_classes)
+        self.fc_classifier_context = nn.Linear(options['D_verb_embed'], self.num_classes) if self.use_gcn else nn.Linear(self.size_cnn_features, self.num_classes)
 
 
     def get_objects_features(self, fm, masks):
@@ -238,9 +238,15 @@ class TwoHeads(nn.Module):
             return np.argmax(one_hot)
 
     def context_head(self, fm_context, B):
+        # print('context_head')
+        # print('fm_context:', fm_context.shape)
         # 3D GAP
         context_vector = self.avgpool_T_7x7(fm_context)
+        # print('context_vector:', context_vector.shape)
         context_representation = context_vector.view(B, self.size_cnn_features)
+
+        if self.use_gcn:
+          context_representation = self.gcn(context_representation, 'verb')
 
         return context_representation
 
@@ -314,6 +320,9 @@ class TwoHeads(nn.Module):
 
     def final_classification(self, context_representation, object_representation):
         if context_representation is not None:
+            # print('final_classification:')
+            # print('  object_representation:', object_representation.shape)
+            # print('  context_representation:', context_representation.shape)
             return self.fc_classifier_object(object_representation) + self.fc_classifier_context(context_representation)
         else:
             return self.fc_classifier_object(object_representation)

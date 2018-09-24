@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from utils.graph import build_vog
 
 DEBUG = False
 
@@ -8,8 +9,9 @@ class GCN(nn.Module):
     super(GCN, self).__init__()
     self.device = options['device']
     if options['adj_type'] == 'prior':
-      self.A_o2v = torch.Tensor(options['A_o2v']).transpose(0,1).to(self.device) # shaoe: (nb_classes, nb_obj_classes)
-      self.A_v2o = torch.Tensor(options['A_v2o']).transpose(0,1).to(self.device)
+      (o2v, _), (v2o, _), (vog, _) = build_vog()
+      self.A_o2v = torch.Tensor(o2v).to(self.device) # shaoe: (nb_classes, nb_obj_classes)
+      self.A_v2o = torch.Tensor(v2o).to(self.device)
     elif options['adj_type'] == 'uniform':
       self.A_o2v = torch.ones((options['nb_classes'], options['nb_obj_classes']))
       self.A_v2o = torch.ones((options['nb_obj_classes'], options['nb_classes']))
@@ -85,6 +87,8 @@ class GCN(nn.Module):
       for l in range(self.n_layers):
         if DEBUG: print('layer', l)
         mod_name = 'Ws_o2v_{}'.format(l)
+        if DEBUG: print('self.A_o2v:', self.A_o2v.shape)
+        if DEBUG: print('fm_obj_embed:', fm_obj_embed.shape)
         fm_verb_embed = self.Ws_o2v[mod_name](torch.matmul(self.A_o2v, fm_obj_embed))
         if DEBUG: print('o2v finished')
         mod_name = 'Ws_v2o_{}'.format(l)
@@ -105,19 +109,22 @@ class GCN(nn.Module):
       return most_activated, most_activated_ids_tensor
     elif mode == 'verb':
       """
-      fm: global context vector: (1, 2048)
+      fm: global context vector: (B, 2048)
       """
       # embed the feature to a lower dimentional space
       fm_verb_embed = self.verb_embed(fm.to(self.device))
-      fm_verb_embed = self.verb_expand(fm_verb_embed.transpose(0,1))
-      fm_verb_embed = fm_verb_embed.transpose(0,1)
+      # fm_verb_embed = self.verb_expand(fm_verb_embed.transpose(0,1))
+      fm_verb_embed = self.verb_expand(fm_verb_embed.unsqueeze(-1))
+      fm_verb_embed = fm_verb_embed.transpose(-1, -2)
+      if DEBUG: print('gcn verb: fm_verb_embed:', fm_verb_embed.shape)
 
       for l in range(self.n_layers):
         mod_name = 'Ws_v2o_{}'.format(l)
         fm_obj_embed = self.Ws_v2o[mod_name](torch.matmul(self.A_v2o, fm_verb_embed))
         mod_name = 'Ws_o2v_{}'.format(l)
         fm_verb_embed = self.Ws_o2v[mod_name](torch.matmul(self.A_o2v, fm_obj_embed))
-      fm_verb_embed = fm_verb_embed.max(0, keepdim=True)[0]
+      fm_verb_embed = fm_verb_embed.max(1, keepdim=False)[0]
+      if DEBUG: print('gcn verb: fm_verb_embed (before return):', fm_verb_embed.shape)
       return fm_verb_embed
     else:
       raise ValueError("GCN forward mode should be 'obj' or 'verb'. Got {}".format(mode))

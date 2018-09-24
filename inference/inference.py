@@ -79,8 +79,8 @@ def main(options):
         best_metric_val = -0.1
 
         # experiment dir: ckpt & log
-        save_dir = '{}/{}_gcn{}_bt{}_lr{:.0e}_wd{:.0e}'.format(
-            options['resume'], options['dataset'], options['use_gcn'],
+        save_dir = '{}/{}_heads{}_gcn{}_bt{}_lr{:.0e}_wd{:.0e}'.format(
+            options['resume'], options['dataset'], options['heads'], options['use_gcn'],
             options['batch_size'], options['lr'], options['wd'],
             )
         if options['use_gcn']:
