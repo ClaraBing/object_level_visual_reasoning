@@ -73,6 +73,7 @@ def update_metric_loss(input, output, metric, loss, losses):
     preds = output.view(-1, output.size(-1)).data.cpu()
     list_idx_correct_preds = metric.add(preds, target)
     metric_val, metric_avg, _ = metric.value()
+    metric.store(metric_avg)
 
     return metric_val, metric_avg, list_idx_correct_preds
 
@@ -146,7 +147,7 @@ def train(epoch, engine, options, device='cpu'):
                 done=time_done, remaining=time_remaining))
             sys.stdout.flush()
 
-    return losses.avg, metric_avg
+    return losses.avg, metric_avg, loss.history, metric.history
 
 
 def validate(epoch, engine, options, device='cpu'):

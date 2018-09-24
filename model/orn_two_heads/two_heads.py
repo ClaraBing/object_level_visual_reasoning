@@ -14,15 +14,18 @@ from model.backbone.resnet.basicblock import BasicBlock2D, BasicBlock3D, BasicBl
 from model.orn_two_heads.aggregation_relations import AggregationRelations
 import math
 from model.orn_two_heads.orn import ObjectRelationNetwork
+from model.orn_two_heads.gcn import GCN
 
 __all__ = [
     'orn_two_heads',
 ]
 
+DEBUG = False
+
 
 class TwoHeads(nn.Module):
-    def __init__(self, num_classes=174, n_objs=353, cnn=None, use_gcn=False,
-                 features_size=512, time=8, mask_size=28, size_RN=256, nb_head=2,
+    def __init__(self, options={}, num_classes=174, n_objs=353, cnn=None, use_gcn=False,
+                 features_size=0, time=4, mask_size=28, size_RN=256, nb_head=2,
                  logits_type='object', f_orn=True,
                  size_2nd_head=14,
                  **kwargs):
@@ -42,6 +45,9 @@ class TwoHeads(nn.Module):
         # CNN: 4 first conv are shared and the 5th blocks is split
         self.cnn = cnn
         self.cnn.out_dim = 5
+
+        if self.use_gcn:
+          self.gcn = GCN(options)
 
         # # If object head only then freeze the cnn because it has already trained for the object recognition task
         if self.logits_type == 'object':
@@ -69,6 +75,7 @@ class TwoHeads(nn.Module):
         self.COCO_Object_Class_from_Features = Classifier(
             size_input=self.size_cnn_features,
             size_output=n_objs)
+        if DEBUG: print('two_heads: COCO classifier: size_input:{} / size_output:{}'.format(self.size_cnn_features, n_objs))
 
         # Embedding of the binary mask by AutoEncoder
         # Goal -> find the latent space of the shape and location of the objects
@@ -85,9 +92,10 @@ class TwoHeads(nn.Module):
 
         # Object Relational Network (ORN) between coco or pixel objects
         size_object = self.size_COCO_object_features + self.size_mask_embedding + self.size_obj_embedding
-        print('Two heads: size_object={} / size_COCO_obj={} / size_mask={} / size_obj_embed={}'.format(
+        if DEBUG:
+          print('Two heads: size_object={} / size_COCO_obj={} / size_mask={} / size_obj_embed={}'.format(
             size_object, self.size_COCO_object_features, self.size_mask_embedding, self.size_obj_embedding
-              ))
+            ))
 
         # ORN
         list_size_hidden_layers = [self.size_RN, self.size_RN, self.size_RN]
@@ -244,17 +252,23 @@ class TwoHeads(nn.Module):
         preds_class_detected_objects = self.COCO_Object_Class_from_Features(objects_features)
 
         if self.use_gcn:
-          object_features = self.gcn(object_features, 'obj', preds_class_detected_objects)
+          # object_features: (batch_size, n_frames, n_top, D_obj_embed)
+          # top_ids: (batch_size, n_frames, n_top)
+          object_features, top_ids = self.gcn(objects_features, 'obj', preds_class_detected_objects)
+        if DEBUG: print('back to object_head (two_heads.py)')
 
         # Reconstruct the binary masks to find the correct embedding (i.e. shape and location of the detected objects)
         embedding_objects_location = self.Encoder_Binary_Mask(masks)
+        if DEBUG: print('mask encoded')
 
         # Reconstruct the COCO class id given the one hot vector
         embedding_obj_id = self.Encoder_COCO_Obj_Class(obj_id)
+        if DEBUG: print('obj_id encoded')
 
         # Full objects description
         full_objects = torch.cat([objects_features, embedding_objects_location, embedding_obj_id],
                                  -1)  # (B,T,K,object_size)
+        if DEBUG: print('full objects:', full_objects.shape)
 
         # Run the Relational Reasoning over the different set of COCO objects
         D = self.size_cnn_features  # 512
@@ -356,13 +370,14 @@ def orn_two_heads(options, **kwargs):
     cnn = resnet_two_heads(options, **kwargs)
 
     # Features dim
-    # features_size = 2048 if depth > 34 else 512
+    features_size = 2048 if depth > 34 else 512
     # size_RN = 512 if depth > 34 else 256
-    features_size = 512 if options['use_gcn'] else 2048
+    # features_size = 512 if options['use_gcn'] else 2048
     size_RN = 512
 
     # Model
     model = TwoHeads(
+        options=options,
         n_objs=options['nb_obj_classes'],
         cnn=cnn,
         use_gcn=options['use_gcn'],

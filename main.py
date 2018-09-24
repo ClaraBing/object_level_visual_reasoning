@@ -45,6 +45,8 @@ if __name__ == '__main__':
                         help='number of crops while testing')
     parser.add_argument('--lr', type=float, default=0.0001, metavar='LR',
                         help='learning rate')
+    parser.add_argument('--wd', type=float, default=1e-5,
+                        help='weight decay')
     parser.add_argument('-j', '--workers', default=0, type=int, metavar='N',
                         help='number of data loading workers')
     parser.add_argument('--print-freq', default=1, type=int, metavar='P',
@@ -74,12 +76,12 @@ if __name__ == '__main__':
                         help='Nature of the 4 residual blocks: B1_B2_B3_B4 where Bi can be 2D, 3D or 2.5D')
     parser.add_argument('--object-head', metavar='BH',
                         default='2D',
-                        help='Nature of teh residual block of the object head: Bi where can be 2D, 3D or 2.5D')
+                        help='Nature of the residual block of the object head: Bi where can be 2D, 3D or 2.5D')
     # GCN model params
     parser.add_argument('--D-obj', type=int, default=2048)
     parser.add_argument('--D-verb', type=int, default=2048),
-    parser.add_argument('--D-obj-embed', type=int, default=512),
-    parser.add_argument('--D-verb-embed', type=int, default=512),
+    parser.add_argument('--D-obj-embed', type=int, default=128),
+    parser.add_argument('--D-verb-embed', type=int, default=128),
     parser.add_argument('--n-layers', type=int, default=2),
     parser.add_argument('--n-top-objs', type=int, default=10),
 
@@ -88,5 +90,10 @@ if __name__ == '__main__':
 
     # Dict
     options = vars(args)
+
+    print('\nOptions:')
+    for key in options:
+      print('{}: {}'.format(key, options[key]))
+    print('\n')
 
     inference.main(options)

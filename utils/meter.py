@@ -15,12 +15,14 @@ class AverageMeter(object):
         self.avg = 0
         self.sum = 0
         self.count = 0
+        self.history = []
 
     def update(self, val, n=1):
         self.val = val
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count
+        self.history += float(val),
 
 
 
@@ -49,6 +51,10 @@ class AveragePrecisionMeter(object):
         """Resets the meter with empty member variables"""
         self.scores = torch.FloatTensor(torch.FloatStorage())
         self.targets = torch.LongTensor(torch.LongStorage())
+        self.history = []
+
+    def store(self, avg):
+        self.history += float(avg),
 
     def add(self, output, target):
         """

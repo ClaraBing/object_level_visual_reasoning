@@ -199,15 +199,18 @@ def print_number(number):
         return number
 
 
-def write_to_log(dataset, resume, epoch, metrics, metrics_per_class):
+def write_to_log(log_path, dataset, resume, epoch, metrics, metrics_per_class, err_str=''):
     # Global metric
-    file_full_name = os.path.join(resume, dataset + '_log')
+    file_full_name = os.path.join(resume, log_path)
     with open(file_full_name, 'a+') as f:
-        f.write('Epoch=%03d, Loss=%.4f, Metric=%.4f\n' % (epoch, metrics[0], metrics[1]))
+        if err_str:
+            f.write(err_str+'\n')
+        else:
+            f.write('Epoch=%03d, Loss=%.4f, Metric=%.4f\n' % (epoch, metrics[0], metrics[1]))
 
     # Per class metric
     if metrics_per_class is not None:
-        file_full_name = os.path.join(resume, dataset + '_per_class_metrics_log')
+        file_full_name = os.path.join(resume, log_path + '_per_class_metrics_log')
         np.savetxt(file_full_name, metrics_per_class.numpy(), fmt='%10.4f', delimiter=',')
 
 
@@ -237,11 +240,11 @@ def count_nb_params(enum_params):
     return nb_params
 
 
-def save_checkpoint(state, is_best, resume, filename='checkpoint.pth.tar'):
-    full_filename = os.path.join(resume, filename)
+def save_checkpoint(state, is_best, save_dir, filename='checkpoint.pth.tar'):
+    full_filename = os.path.join(save_dir, filename)
     torch.save(state, full_filename)
     if is_best:
-        full_filename_best = os.path.join(resume, 'model_best.pth.tar')
+        full_filename_best = os.path.join(save_dir, filename.replace('.pth', '_best.pth'))
         shutil.copyfile(full_filename, full_filename_best)
 
 
