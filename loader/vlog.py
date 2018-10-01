@@ -9,7 +9,6 @@ import numpy as np
 # import ipdb
 import pickle
 from pycocotools import mask as maskUtils
-import lintel
 import time
 from torch.utils.data.dataloader import default_collate
 from random import shuffle
