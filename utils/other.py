@@ -80,7 +80,7 @@ def get_loss_and_metric(options):
     elif options['dataset'] == 'epic':
        # TODO: use better metric/loss
         metric = AveragePrecisionMeter
-        loss = CriterionLinearCombination(['bce', 'ce'], [15.0, 1.0])
+        loss = CriterionLinearCombination(['ce'], [1.0])
     else:
         raise NameError
 
@@ -114,6 +114,7 @@ class CriterionLinearCombination(Module):
             target_i, input_i = list_target[i], list_input[i]
             if input_i is not None:
                 if isinstance(criterion_i, nn.CrossEntropyLoss):
+                    target_i = target_i.nonzero()[:, 1]
                     target_i = target_i.type(torch.LongTensor)
                 elif isinstance(criterion_i, nn.BCEWithLogitsLoss):
                     target_i = target_i.type(torch.FloatTensor)
@@ -133,7 +134,7 @@ def load_from_dir(model, optimizer, options):
     epoch = 0
     if options['resume']:
         if os.path.isdir(options['resume']):
-            ckpt_resume = os.path.join(options['resume'], 'model_best.pth.tar')
+            ckpt_resume = os.path.join(options['resume'], options['ckpt_name'])
             if not os.path.isfile(ckpt_resume):
               untarred = ckpt_resume.replace('.tar', '')
               if os.path.isfile(untarred):

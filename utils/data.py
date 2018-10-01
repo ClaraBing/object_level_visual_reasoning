@@ -25,6 +25,9 @@ def ts2info(fannot, frame_root, mask_root):
     pid, uid = annot[1], annot[2]
     ts_start, ts_end, frame_start, frame_end = annot[4:8]
     verb_cls = int(annot[9])
+    noun_cls = int(annot[11])
+    all_noun_classes = annot[13].replace('[', '').replace(']', '').replace(' ', '')
+    all_noun_classes = [int(each) for each in all_noun_classes.split(',')]
     frame_start = int(frame_start)
     frame_end = int(frame_end)
     frames = []
@@ -33,7 +36,12 @@ def ts2info(fannot, frame_root, mask_root):
     mask_name = mask_format.format(uid, ts_start, ts_end)
     mask_path = os.path.join(mask_root, mask_name) 
     if os.path.exists(mask_path):
-      map_ts2info[mask_name] = {'frames':frames, 'verb_cls':verb_cls, 'len':len(frames)}
+      map_ts2info[mask_name] = {
+        'frames':frames,
+        'verb_cls':verb_cls,
+        'len':len(frames),
+        'noun_cls':noun_cls,
+        'all_noun_classes':all_noun_classes}
 
   return map_ts2info
 

@@ -49,6 +49,16 @@ def forward_backward(model, input_var, criterion, optimizer=None, device='cpu',
     # update output
     output = output if isinstance(output, tuple) else (output, None)
 
+    print('output[0].shape:', output[0].shape)
+    preds = output[0].max(-1)
+    print('obj_id:', obj_id.shape)
+    gts = obj_id.nonzero()
+    print('nonzero:', gts.shape)
+    gts = gts[:, 1]
+    print('preds.shape:', preds.shape)
+    print('gts shape:', gts.shape)
+    exit()
+
     # compute loss
     loss = criterion(output, [input_var['target'], obj_id], device) # TODO: check criterion
 
@@ -147,7 +157,7 @@ def train(epoch, engine, options, device='cpu'):
                 done=time_done, remaining=time_remaining))
             sys.stdout.flush()
 
-    return losses.avg, metric_avg, loss.history, metric.history
+    return losses.avg, metric_avg, losses.history, metric.history
 
 
 def validate(epoch, engine, options, device='cpu'):

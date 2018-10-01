@@ -24,13 +24,15 @@ DEBUG = False
 
 
 class TwoHeads(nn.Module):
-    def __init__(self, options={}, num_classes=174, n_objs=353, cnn=None, use_gcn=False,
+    def __init__(self, options={}, num_classes=174, n_objs=353, cnn=None, use_obj_gcn=False, use_context_gcn=False,
                  features_size=0, time=4, mask_size=28, size_RN=256, nb_head=2,
                  logits_type='object', f_orn=True,
                  size_2nd_head=14,
                  **kwargs):
         super(TwoHeads, self).__init__()
-        self.use_gcn = use_gcn
+        self.use_obj_gcn = use_obj_gcn
+        self.use_context_gcn = use_context_gcn
+        self.use_mask = True # TODO: update this
         # Basic settings
         self.num_classes = num_classes
         self.time = time
@@ -46,7 +48,7 @@ class TwoHeads(nn.Module):
         self.cnn = cnn
         self.cnn.out_dim = 5
 
-        if self.use_gcn:
+        if self.use_obj_gcn or self.use_context_gcn:
           self.gcn = GCN(options)
 
         # # If object head only then freeze the cnn because it has already trained for the object recognition task
@@ -77,11 +79,12 @@ class TwoHeads(nn.Module):
             size_output=n_objs)
         if DEBUG: print('two_heads: COCO classifier: size_input:{} / size_output:{}'.format(self.size_cnn_features, n_objs))
 
-        # Embedding of the binary mask by AutoEncoder
-        # Goal -> find the latent space of the shape and location of the objects
-        self.size_mask_embedding = 100
-        self.Encoder_Binary_Mask = EncoderMLP(input_size=self.size_mask * self.size_mask,
-                                              list_hidden_size=[self.size_mask_embedding, self.size_mask_embedding])
+        if self.use_mask:
+          # Embedding of the binary mask by AutoEncoder
+          # Goal -> find the latent space of the shape and location of the objects
+          self.size_mask_embedding = 100
+          self.Encoder_Binary_Mask = EncoderMLP(input_size=self.size_mask * self.size_mask,
+                                                list_hidden_size=[self.size_mask_embedding, self.size_mask_embedding])
 
         # Embedding of the object id
         # Goal -> find the latent space of object id better than just a one hot vector
@@ -91,7 +94,9 @@ class TwoHeads(nn.Module):
                                                  list_hidden_size=[self.size_obj_embedding, self.size_obj_embedding])
 
         # Object Relational Network (ORN) between coco or pixel objects
-        size_object = self.size_COCO_object_features + self.size_mask_embedding + self.size_obj_embedding
+        size_object = self.size_COCO_object_features + self.size_obj_embedding
+        if self.use_mask:
+          size_object += self.size_mask_embedding
         if DEBUG:
           print('Two heads: size_object={} / size_COCO_obj={} / size_mask={} / size_obj_embed={}'.format(
             size_object, self.size_COCO_object_features, self.size_mask_embedding, self.size_obj_embedding
@@ -120,7 +125,7 @@ class TwoHeads(nn.Module):
 
         ## Final classification
         self.fc_classifier_object = nn.Linear(self.size_relation_features, self.num_classes)
-        self.fc_classifier_context = nn.Linear(options['D_verb_embed'], self.num_classes) if self.use_gcn else nn.Linear(self.size_cnn_features, self.num_classes)
+        self.fc_classifier_context = nn.Linear(options['D_verb_embed'], self.num_classes) if self.use_context_gcn else nn.Linear(self.size_cnn_features, self.num_classes)
 
 
     def get_objects_features(self, fm, masks):
@@ -245,7 +250,7 @@ class TwoHeads(nn.Module):
         # print('context_vector:', context_vector.shape)
         context_representation = context_vector.view(B, self.size_cnn_features)
 
-        if self.use_gcn:
+        if self.use_context_gcn:
           context_representation = self.gcn(context_representation, 'verb')
 
         return context_representation
@@ -257,18 +262,21 @@ class TwoHeads(nn.Module):
         # Classify each detected objects to make sure we extract good object descriptors
         preds_class_detected_objects = self.COCO_Object_Class_from_Features(objects_features)
 
-        if self.use_gcn:
+        if self.use_obj_gcn:
           # object_features: (batch_size, n_frames, n_top, D_obj_embed)
           # top_ids: (batch_size, n_frames, n_top)
           object_features, top_ids = self.gcn(objects_features, 'obj', preds_class_detected_objects)
+          # print('top_ids:', top_ids.shape)
         if DEBUG: print('back to object_head (two_heads.py)')
 
         # Reconstruct the binary masks to find the correct embedding (i.e. shape and location of the detected objects)
-        embedding_objects_location = self.Encoder_Binary_Mask(masks)
-        if DEBUG: print('mask encoded')
+        if self.use_mask:
+          embedding_objects_location = self.Encoder_Binary_Mask(masks)
+          if DEBUG: print('mask encoded')
 
         # Reconstruct the COCO class id given the one hot vector
         embedding_obj_id = self.Encoder_COCO_Obj_Class(obj_id)
+        # print('obj_id shape:', obj_id.shape)
         if DEBUG: print('obj_id encoded')
 
         # Full objects description
@@ -330,6 +338,7 @@ class TwoHeads(nn.Module):
     def forward(self, x):
         """Forward pass from a tensor of size (B,C,T,W,H)"""
         clip, masks, obj_id, bbox, max_nb_obj = x['clip'], x['mask'], x['obj_id'], x['obj_bbox'], x['max_nb_obj']
+        # print('forward: obj_id:', obj_id.shape) # e.g. [0, 4, 10, 353]
 
         # Get only the real detected objects
         masks, obj_id, bbox = self.squeeze_masks(max_nb_obj, masks, obj_id, bbox)
@@ -381,7 +390,7 @@ def orn_two_heads(options, **kwargs):
     # Features dim
     features_size = 2048 if depth > 34 else 512
     # size_RN = 512 if depth > 34 else 256
-    # features_size = 512 if options['use_gcn'] else 2048
+    # features_size = 512 if options['use_obj_gcn'] else 2048
     size_RN = 512
 
     # Model
@@ -389,7 +398,8 @@ def orn_two_heads(options, **kwargs):
         options=options,
         n_objs=options['nb_obj_classes'],
         cnn=cnn,
-        use_gcn=options['use_gcn'],
+        use_obj_gcn=options['use_obj_gcn'],
+        use_context_gcn=options['use_context_gcn'],
         features_size=features_size,
         size_RN=size_RN,
         logits_type=heads,

@@ -3,6 +3,7 @@ import argparse
 import os
 import shutil
 import time
+from datetime import datetime
 
 import torch
 import torch.nn as nn
@@ -66,7 +67,7 @@ def main(options):
         # Val
         loss_val, metric_val, per_class_metric_val, df_good, df_failure, df_objects = validate(epoch, engine, options, device=device)
         # Write into log
-        log_path='eval_{:s}_gcn{}.log'.format(options['dataset'], options['use_gcn'])
+        log_path='eval_{:s}_gcnObj{}_gcnCtxt{}.log'.format(options['dataset'], options['use_obj_gcn'], options['use_context_gcn'])
         write_to_log(log_path, val_dataset.dataset, options['resume'], epoch, [loss_val, metric_val], per_class_metric_val)
         # Save good and failures and object presence
         df_good.to_csv(os.path.join(options['resume'], 'df_good_preds.csv'), sep=',', encoding='utf-8')
@@ -79,25 +80,29 @@ def main(options):
         best_metric_val = -0.1
 
         # experiment dir: ckpt & log
-        save_dir = '{}/{}_heads{}_gcn{}_bt{}_lr{:.0e}_wd{:.0e}'.format(
-            options['resume'], options['dataset'], options['heads'], options['use_gcn'],
+        save_dir = '{}/{}_heads{}_gcnObj{}_gcnCtxt{}_bt{}_lr{:.0e}_wd{:.0e}'.format(
+            options['resume'], options['dataset'], options['heads'], options['use_obj_gcn'], options['use_context_gcn'],
             options['batch_size'], options['lr'], options['wd'],
             )
-        if options['use_gcn']:
+        if options['use_obj_gcn'] or options['use_context_gcn']:
             save_dir += '_adj{}_oEmb{}_vEmb{}_nLayer{}_nTopObjs{}'.format(
                 options['adj_type'], options['D_obj_embed'], options['D_verb_embed'],
                 options['n_layers'], options['n_top_objs']
                 )
+        if options['save_token']:
+          save_dir += '_' + options['save_token']
         if os.path.exists(save_dir):
-          proceed = input('WARNING: Dir exists: {}\nWould you like to proceed (may overwrite previous ckpts) [y/N]?'.format(save_dir))
-          if 'n' in proceed or 'N' in proceed:
-            print('Do not overwrite -- Exiting.')
-            exit(0)
-        else:
-          os.makedirs(save_dir)
+          now = datetime.now()
+          save_dir = save_dir + '_{:02d}{:02d}{:02d}{:02d}{:02d}'.format(now.month, now.day, now.hour, now.minute, now.second)
+          # proceed = input('WARNING: Dir exists: {}\nWould you like to proceed (may overwrite previous ckpts) [y/N]?'.format(save_dir))
+          # if 'n' in proceed or 'N' in proceed:
+          #   print('Do not overwrite -- Exiting.')
+          #   exit(0)
+        os.makedirs(save_dir)
         print('ckpt save_dir:', save_dir)
+        shutil.copy(os.path.join(os.getcwd(), 'training_epic.sh'), os.path.join(save_dir))
 
-        log_path='train_{:s}_gcn{}.log'.format(options['dataset'], options['use_gcn'])
+        log_path='train_{:s}_gcnObj{}_gcnContext{}.log'.format(options['dataset'], options['use_obj_gcn'], options['use_context_gcn'])
 
         for epoch in range(1, options['epochs'] + 1):
             try:

@@ -25,8 +25,6 @@ class AverageMeter(object):
         self.history += float(val),
 
 
-
-
 class AveragePrecisionMeter(object):
     """
     The APMeter measures the average precision per class.

@@ -96,7 +96,9 @@ class GCN(nn.Module):
         if DEBUG: print('v2o finished')
 
       # select the top n_top_objs categories
+      # fm_obj_embed.shape: e.g. [8, 4, 353, 128]
       if DEBUG: print('fm_obj_embed:', fm_obj_embed.shape)
+      # most_activated_ids_tensor: e.g. shape = [8, 4, 10]
       most_activated_ids_tensor = fm_obj_embed.sum(-1).sort(descending=True)[1][:, :, :self.n_top_objs]
       if DEBUG: print('most_activated_ids (tensor):', most_activated_ids_tensor.shape)
       ti, tj, tk = most_activated_ids_tensor.shape

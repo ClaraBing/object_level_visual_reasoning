@@ -19,7 +19,8 @@ if __name__ == '__main__':
                         help='model architecture: ' +
                              ' | '.join(model_names) +
                              ' (default: orn_two_heads')
-    parser.add_argument('--use-gcn', type=int, choices=[0,1])
+    parser.add_argument('--use-obj-gcn', type=int, choices=[0,1])
+    parser.add_argument('--use-context-gcn', type=int, choices=[0,1])
     parser.add_argument('--adj-type', type=str, default='uniform', choices=['prior', 'uniform', 'learned'],
                         help="Type of adjacency matrix for GCN. Choose among 'prior', 'uniform', or 'learned'.")
     parser.add_argument('--depth', default=50, type=int,
@@ -56,12 +57,16 @@ if __name__ == '__main__':
                         # default='./resume/vlog',
                         type=str, metavar='PATH',
                         help='path to latest checkpoint')
+    parser.add_argument('--save-token', default='', type=str, 
+                        help='special (hopefully uniq) token as notes for different experiment settings')
+    parser.add_argument('--ckpt-name', default='model_best.pth.tar', type=str, help='checkpoint filename (w/o dir path)')
     parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                         help='evaluation mode')
     parser.add_argument('--cuda', dest='cuda', action='store_true',
                         help='cuda mode')
     parser.add_argument('--add-background', dest='add_background', action='store_true',
                         help='add the background as one object')
+    parser.add_argument('--mask-dir', type=str, default='masks/preds_100x_100_50', help='dir of pre-extracted mask files')
     parser.add_argument('--mask-confidence', type=float, default=0.50, metavar='LR',
                         help='mininum confidence for the masks')
     parser.add_argument('--pooling', metavar='POOL',

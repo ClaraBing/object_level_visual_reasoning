@@ -34,7 +34,7 @@ class VideoDataset(data.Dataset):
                  usual_transform=False,
                  add_background=True,
                  #
-                 video_dir='videos_256x256_30', mask_dir='masks/preds_100x100_50',
+                 video_dir='videos_256x256_30', 
                  #
                  nb_obj_t_max=10, mask_confidence=0.5,
                  video_suffix='.mp4',
@@ -53,7 +53,7 @@ class VideoDataset(data.Dataset):
         self.mask_confidence = mask_confidence
         self.video_dir_full = os.path.join(self.root, self.video_dir)
         self.video_suffix = video_suffix
-        self.mask_dir = mask_dir
+        self.mask_dir = options['mask_dir']
         self.mask_dir_full = os.path.join(self.root, self.mask_dir)
         self.nb_crops = nb_crops
         self.dataset = dataset

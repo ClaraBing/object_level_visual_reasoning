@@ -23,7 +23,7 @@ class EPIC(VideoDataset):
     def __init__(self, options, **kwargs):
         super().__init__(options, **kwargs)
 
-        self.ts2info_fn = '/vision2/u/bingbin/ORN/data/ts2info.pkl'
+        self.ts2info_fn = '/vision2/u/bingbin/ORN/data/ts2info_v1.pkl'
         with open(self.ts2info_fn, 'rb') as handle:
           self.ts2info = pickle.load(handle)
 
@@ -61,6 +61,7 @@ class EPIC(VideoDataset):
     def get_target(self, id):
         # verb_cls: 0 - 124
         verb_cls = self.dict_video_label[id]
+        # return verb_cls
         label = np.zeros([self.nb_classes])
         label[verb_cls] = 1
         return torch.FloatTensor(label)
