@@ -2,6 +2,7 @@ from utils.meter import *
 import time
 import torch
 # import ipdb
+import pdb
 import sys
 import torch.nn as nn
 from utils.meter import *
@@ -49,23 +50,10 @@ def forward_backward(model, input_var, criterion, optimizer=None, device='cpu',
     # update output
     # output = output if isinstance(output, tuple) else (output, None)
 
-    logits, preds_class_detected_objects, ret_obj_id, gcn_ids = model(input_var)
-    print('obj_id:', obj_id)
-    print('ret_obj_id:', ret_obj_id)
-
-
-    # print('logits.shape:', logits.shape)
-    preds = output[0].max(-1)
-    # print('obj_id:', obj_id.shape)
-    gts = obj_id.nonzero()
-    # print('nonzero:', gts.shape)
-    gts = gts[:, 1]
-    # print('preds.shape:', preds.shape)
-    # print('gts shape:', gts.shape)
-    # exit() # TODO: remove after debugging
+    logits, preds_class_detected_objects, gcn_ids = model(input_var)
 
     # compute loss
-    loss = criterion(output, [input_var['target'], obj_id], device) # TODO: check criterion
+    loss = criterion((logits, preds_class_detected_objects), [input_var['target'], obj_id], device) # TODO: check criterion
 
     # backward
     if optimizer is not None:
@@ -75,7 +63,10 @@ def forward_backward(model, input_var, criterion, optimizer=None, device='cpu',
         torch.nn.utils.clip_grad_norm_(model.parameters(), 10)  # clip grad
         optimizer.step()
 
-    return output[0], loss  # return the output for the action only - objects preds are just regularizer
+    preds = logits.max(-1)[1]
+    gts = input_var['target'].nonzero()[:, 1]
+
+    return logits, loss, preds, gts  # return the output for the action only - objects preds are just regularizer
 
 
 def update_metric_loss(input, output, metric, loss, losses):
@@ -129,6 +120,9 @@ def train(epoch, engine, options, device='cpu'):
     print("")
     print('#train_data_loader:', len(data_loader))
     print('print_freq:', options['print_freq'])
+
+    all_preds = torch.LongTensor([]).to(device)
+    all_gts = torch.LongTensor([]).to(device)
     for i, input in enumerate(data_loader):
         if i == 1:
           print('first iteration passed')
@@ -139,7 +133,10 @@ def train(epoch, engine, options, device='cpu'):
         input_var = make_variable_all_input(input, device=device)
 
         # compute output
-        output, loss = forward_backward(model, input_var, criterion, optimizer, device)
+        output, loss, preds, gts = forward_backward(model, input_var, criterion, optimizer, device)
+
+        all_preds = torch.cat([all_preds, preds])
+        all_gts = torch.cat([all_gts, gts])
 
         # measure elapsed time
         batch_time.update(time.time() - end)

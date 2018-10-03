@@ -366,7 +366,7 @@ class TwoHeads(nn.Module):
         # Final classification
         logits = self.final_classification(context_representation, object_representation)
 
-        return logits, preds_class_detected_objects, obj_id, gcn_ids
+        return logits, preds_class_detected_objects, gcn_ids
 
 
 def orn_two_heads(options, **kwargs):
