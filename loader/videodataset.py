@@ -201,7 +201,14 @@ class VideoDataset(data.Dataset):
 
                             # Masks
                             rle_obj = segms[t][c][i]
-                            m = maskUtils.decode(rle_obj)  # Python COCO API
+                            if type(rle_obj['counts']) == np.ndarray:
+                              # format of our masks: 'counts' are the 4 coordinates of a bbox
+                              xmin, ymin, xmax, ymax = rle_obj['counts']
+                              m = np.zeros((H, W))
+                              m[xmin:xmax+1, ymin:ymax] = 1
+                            else:
+                              # format of the provided mask (in coco format): 'counts' is a byte string
+                              m = maskUtils.decode(rle_obj)  # Python COCO API
                             # My resize
                             # m = resize(m, (H, W), (self.real_mask_h, self.real_mask_w), thresold=0.1
                             # Resize
