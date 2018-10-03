@@ -21,6 +21,7 @@ __all__ = [
 ]
 
 DEBUG = False
+CHECK_IDS = True
 
 
 class TwoHeads(nn.Module):
@@ -307,7 +308,7 @@ class TwoHeads(nn.Module):
         else:
             raise Exception
 
-        return object_representation, preds_class_detected_objects
+        return object_representation, preds_class_detected_objects, top_ids if self.use_obj_gcn else []
 
     def add(self, logits, logits_head):
         if logits is None:
@@ -357,7 +358,7 @@ class TwoHeads(nn.Module):
 
         # HEADS
         if 'object' in self.logits_type:
-            object_representation, preds_class_detected_objects = self.object_head(fm_objects, masks, obj_id, B=B)
+            object_representation, preds_class_detected_objects, gcn_ids = self.object_head(fm_objects, masks, obj_id, B=B)
 
         if 'context' in self.logits_type:
             context_representation = self.context_head(fm_context, B=B)
@@ -365,7 +366,7 @@ class TwoHeads(nn.Module):
         # Final classification
         logits = self.final_classification(context_representation, object_representation)
 
-        return logits, preds_class_detected_objects
+        return logits, preds_class_detected_objects, obj_id, gcn_ids
 
 
 def orn_two_heads(options, **kwargs):

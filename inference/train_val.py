@@ -41,23 +41,28 @@ def get_obj_id_for_loss(input_var, is_Variable=True, j=0):
 def forward_backward(model, input_var, criterion, optimizer=None, device='cpu',
                      j=1):
     # compute output
-    output = model(input_var)
+    # output = model(input_var)
 
     # retrieve object id
     obj_id = get_obj_id_for_loss(input_var, j=j)
 
     # update output
-    output = output if isinstance(output, tuple) else (output, None)
+    # output = output if isinstance(output, tuple) else (output, None)
 
-    print('output[0].shape:', output[0].shape)
+    logits, preds_class_detected_objects, ret_obj_id, gcn_ids = model(input_var)
+    print('obj_id:', obj_id)
+    print('ret_obj_id:', ret_obj_id)
+
+
+    # print('logits.shape:', logits.shape)
     preds = output[0].max(-1)
-    print('obj_id:', obj_id.shape)
+    # print('obj_id:', obj_id.shape)
     gts = obj_id.nonzero()
-    print('nonzero:', gts.shape)
+    # print('nonzero:', gts.shape)
     gts = gts[:, 1]
-    print('preds.shape:', preds.shape)
-    print('gts shape:', gts.shape)
-    exit()
+    # print('preds.shape:', preds.shape)
+    # print('gts shape:', gts.shape)
+    # exit() # TODO: remove after debugging
 
     # compute loss
     loss = criterion(output, [input_var['target'], obj_id], device) # TODO: check criterion
