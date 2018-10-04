@@ -53,6 +53,7 @@ def ts2info_wrapper():
   fpkl_out = '/vision2/u/bingbin/ORN/meta/ts2info.pkl'
   if os.path.exists(fpkl_out):
     overwrite = input('File "{:s}" already exists.\nOverwrite? (y/N)'.format(fpkl_out))
+    print()
     if 'n' in overwrite or 'N' in overwrite:
       return
 
@@ -97,6 +98,7 @@ def prep_obj_lookup_wrapper():
   fsave = '/vision2/u/bingbin/EPIC_KITCHENS_2018/annotations/obj_lookup.pkl'
   if os.path.exists(fsave):
     overwrite = input('File "{:s}" already exists.\nOverwrite? (y/N)'.format(fsave))
+    print()
     if 'n' in overwrite or 'N' in overwrite:
       return
 
@@ -106,22 +108,27 @@ def prep_obj_lookup_wrapper():
   with open(fsave, 'wb') as handle:
     pickle.dump(lookup, handle)
 
-def prep_gt_masks(frame_lookup, box_lookup, size_lookup, save_format):
+def prep_gt_masks(frame_lookup, box_lookup, size_lookup, save_format, overwrite):
   boxes = []
   segms = []
   for each in frame_lookup:
     pid = each['participant_id']
     vid = each['video_id']
     ts_start, ts_stop = each['start_timestamp'], each['stop_timestamp']
+    save_path = save_format.format(vid, ts_start, ts_stop) 
+    if os.path.exists(save_path) and not overwrite:
+      continue
 
     out = {'segms':[[] for _ in range(353)], 'boxes':[[] for _ in range(353)]}
     # NOTE: each['clips'][0] since only 1 sampled clip per video
     for i,frame in enumerate(each['clips'][0]):
       fid = int(os.path.basename(frame).split('_')[1].split('.')[0])
       nn_obj_fid = 30 * round(fid/30) + 1
-      while nn_obj_fid not in box_lookup[vid]:
+      while nn_obj_fid not in box_lookup[vid] and nn_obj_fid>0:
         # corner case: out of bound: too many verb frames than obj frames
         nn_obj_fid -= 30
+      if nn_obj_fid <= 0:
+        nn_obj_fid = sorted(box_lookup[vid].keys())[0]
       boxes = box_lookup[vid][nn_obj_fid]
       nid = boxes['noun_cls']
       for box in boxes['boxes']:
@@ -131,8 +138,8 @@ def prep_gt_masks(frame_lookup, box_lookup, size_lookup, save_format):
         },
         out['boxes'][nid] += np.array(box+[1]),
 
-      with open(save_format.format(vid, ts_start, ts_stop), 'wb') as handle:
-        pickle.dump(out, handle)
+    with open(save_path, 'wb') as handle:
+      pickle.dump(out, handle)
 
 def prep_gt_masks_wrapper():
   size_file = '/vision2/u/bingbin/ORN/meta/size_dict.pkl'
@@ -143,7 +150,15 @@ def prep_gt_masks_wrapper():
     overwrite = input('Folder "{:s}" already exists.\nOverwrite? (y/N)'.format(save_dir))
     if 'n' in overwrite or 'N' in overwrite:
       print('Skipping prep_gt_masks_wrapper.')
+      print()
       return
+    overwrite_all = input('Overwrite all? (y/N)')
+    if 'y' in overwrite_all or 'Y' in overwrite_all:
+      overwrite_all = True
+      print('-- Will overwrite existing pickles.\n')
+    else:
+      overwrite_all = False
+      print('-- Will skip existing pickles.\n')
 
   os.makedirs(save_dir, exist_ok=True)
   save_format = os.path.join(save_dir, "{:s}_{:s}_{:s}.pkl")
@@ -155,7 +170,7 @@ def prep_gt_masks_wrapper():
   with open(box_lookup_file, 'rb') as handle:
     box_lookup = pickle.load(handle)
 
-  prep_gt_masks(frame_lookup, box_lookup, size_lookup, save_format)
+  prep_gt_masks(frame_lookup, box_lookup, size_lookup, save_format, overwrite_all)
 
 
 if __name__ == '__main__':
