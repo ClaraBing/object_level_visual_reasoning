@@ -7,6 +7,7 @@ from torch.autograd import Variable
 from model.backbone.resnet_based import resnet_two_heads
 import numpy as np
 import random
+import pdb
 from model.orn_two_heads.encoder import EncoderMLP
 from model.orn_two_heads.classifier import Classifier
 from model.backbone.resnet.bottleneck import Bottleneck2D, Bottleneck3D, Bottleneck2_1D
@@ -134,7 +135,7 @@ class TwoHeads(nn.Module):
         # fm_old = fm
         fm = fm.transpose(1, 2)  # (B, T, D, 14, 14)
         B, T, D, W, H = fm.size()
-        fm = fm.view(B * T, D, W, H)
+        fm = fm.contiguous().view(B * T, D, W, H)
         fm_up = F.upsample(fm, size=(self.size_mask, self.size_mask), mode='bilinear', align_corners=True)
         fm_up = fm_up.view(B, T, D, self.size_mask, self.size_mask)
         fm_up = fm_up.transpose(1, 2)  # (B, D, T, 28, 28)
@@ -345,13 +346,18 @@ class TwoHeads(nn.Module):
         masks, obj_id, bbox = self.squeeze_masks(max_nb_obj, masks, obj_id, bbox)
 
         # Get the batch size and the temporal dimension
-        B = clip.size(0)  # batch size
-        T = clip.size(2)  # number of timesteps in the sequence
-        K = masks.size(2)  # number of objects
+        if clip is not None:
+          B = clip.size(0)  # batch size
+          T = clip.size(2)  # number of timesteps in the sequence
+          # Get the two feature maps: context and object reasoning
+          fm_context, fm_objects = self.cnn.get_two_heads_feature_maps(x, T=T, out_dim=5,
+                                                                       heads_type=self.logits_type)
+        else:
+          fm_context, fm_objects = x['fm_context'], x['fm_obj']
+          B = fm_context.size(0)
 
-        # Get the two feature maps: context and object reasoning
-        fm_context, fm_objects = self.cnn.get_two_heads_feature_maps(x, T=T, out_dim=5,
-                                                                     heads_type=self.logits_type)
+        # pdb.set_trace()
+        K = masks.size(2)  # number of objects
 
         # Init returned variable
         context_representation, object_representation, preds_class_detected_objects = None, None, None

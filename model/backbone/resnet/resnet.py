@@ -4,6 +4,7 @@ from model.backbone.resnet.basicblock import BasicBlock2D
 from model.backbone.resnet.bottleneck import Bottleneck2D
 from utils.other import transform_input
 import torch
+import pdb
 from utils.meter import *
 
 model_urls = {
@@ -252,6 +253,8 @@ class ResNet(nn.Module):
             fm_context = transform_input(fm_context, out_dim, T=T)
         else:
             fm_context = None
+
+        # pdb.set_trace()
 
         return fm_context, fm_objects
 

@@ -1,6 +1,7 @@
 import pickle
 from loader.vlog import VLOG
 from loader.epic import EPIC
+from loader.feats_epic import FeatsEPIC
 import torch
 from loader.videodataset import my_collate
 from torch.nn import Module
@@ -35,6 +36,12 @@ def get_datasets_and_dataloaders(options, device='cpu'):
         options['nb_classes'] = 30
     elif options['dataset'] == 'epic':
         VideoDataset = EPIC
+        train_set_name = 'train'
+        val_set_name = 'val'
+        nb_crops = options['nb_crops']
+        options['nb_classes'] = 125
+    elif options['dataset'] == 'feats_epic':
+        VideoDataset = FeatsEPIC
         train_set_name = 'train'
         val_set_name = 'val'
         nb_crops = options['nb_crops']
@@ -77,7 +84,7 @@ def get_loss_and_metric(options):
         metric = AveragePrecisionMeter
         # Loss
         loss = CriterionLinearCombination(['bce', 'ce'], [15.0, 1.0])
-    elif options['dataset'] == 'epic':
+    elif options['dataset'] == 'epic' or options['dataset'] == 'feats_epic':
        # TODO: use better metric/loss
         metric = AveragePrecisionMeter
         loss = CriterionLinearCombination(['ce'], [1.0])
@@ -99,6 +106,8 @@ class CriterionLinearCombination(Module):
                 self.list_criterion.append(nn.BCEWithLogitsLoss())
             elif criterion_name == 'ce':
                 self.list_criterion.append(nn.CrossEntropyLoss())
+            elif criterion_name == 'l1':
+                self.list_criterion.append(nn.L1Loss())
             else:
                 raise Exception
             # Weight
