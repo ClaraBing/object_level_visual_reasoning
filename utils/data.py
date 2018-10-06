@@ -2,6 +2,7 @@ import os
 import csv
 import numpy as np
 import pickle
+import pdb
 
 def ts2info(fannot, frame_root, mask_root):
   """
@@ -80,17 +81,26 @@ def prep_obj_lookup(fannot, box_parser):
   header = data[0]
 
   lookup = {}
+  n_empty, n_nonempty = 0, 0
   for nid, noun, pid, vid, fid, boxes in data[1:]:
     if boxes == '[]':
       boxes_parsed = []
     else:
       boxes_parsed = [box_parser(each) for each in boxes.split('), (')]
+    if any([each!=[] for each in boxes_parsed]):
+      # print('all_empty: '.format(vid, fid))
+      n_nonempty += 1
+    else:
+      n_empty += 1
+    # pdb.set_trace()
     if vid not in lookup:
       lookup[vid] = {}
     lookup[vid][int(fid)] = {
       'noun_cls': int(nid),
       'noun': noun,
       'boxes': boxes_parsed}
+  print('n_empty:', n_empty)
+  print('n_nonempty:', n_nonempty)
   return lookup
 
 def prep_obj_lookup_wrapper():
@@ -111,6 +121,7 @@ def prep_obj_lookup_wrapper():
 def prep_gt_masks(frame_lookup, box_lookup, size_lookup, save_format, overwrite):
   boxes = []
   segms = []
+  n_empty, n_nonempty = 0, 0
   for each in frame_lookup:
     pid = each['participant_id']
     vid = each['video_id']
@@ -119,9 +130,13 @@ def prep_gt_masks(frame_lookup, box_lookup, size_lookup, save_format, overwrite)
     if os.path.exists(save_path) and not overwrite:
       continue
 
-    out = {'segms':[[] for _ in range(353)], 'boxes':[[] for _ in range(353)]}
+    # out = {'segms':[[] for _ in range(353)], 'boxes':[[] for _ in range(353)]}
+    out = {'segms':[], 'boxes':[]}
     # NOTE: each['clips'][0] since only 1 sampled clip per video
+    not_empty = False
     for i,frame in enumerate(each['clips'][0]):
+      out['segms'] += [[] for _ in range(353)],
+      out['boxes'] += [[] for _ in range(353)],
       fid = int(os.path.basename(frame).split('_')[1].split('.')[0])
       nn_obj_fid = 30 * round(fid/30) + 1
       while nn_obj_fid not in box_lookup[vid] and nn_obj_fid>0:
@@ -131,12 +146,21 @@ def prep_gt_masks(frame_lookup, box_lookup, size_lookup, save_format, overwrite)
         nn_obj_fid = sorted(box_lookup[vid].keys())[0]
       boxes = box_lookup[vid][nn_obj_fid]
       nid = boxes['noun_cls']
+      # pdb.set_trace()
+      not_empty = not_empty or boxes['boxes']!=[]
       for box in boxes['boxes']:
-        out['segms'][nid] += {
+        out['segms'][i][nid] += {
           'size': size_lookup[pid],
           'counts':np.array(box),
         },
-        out['boxes'][nid] += np.array(box+[1]),
+        out['boxes'][i][nid] += np.array(box+[1]),
+    # if all_empty:
+    #   print('all empty:', os.path.basename(save_path))
+    if not_empty:
+      n_nonempty += 1
+    else:
+      n_empty += 1
+    print('n_empty:{} / n_nonempty:{}'.format(n_empty, n_nonempty))
 
     with open(save_path, 'wb') as handle:
       pickle.dump(out, handle)
