@@ -1,10 +1,11 @@
 import torch
 import torch.nn as nn
 from utils.graph import build_vog
+import pdb
 
-class GCN(nn.Module):
+class GCNv2(nn.Module):
   def __init__(self, options):
-    super(GCN, self).__init__()
+    super(GCNv2, self).__init__()
     self.device = options['device']
     if options['adj_type'] == 'prior':
       (o2v, _), (v2o, _), (vog, _) = build_vog()
@@ -23,12 +24,13 @@ class GCN(nn.Module):
       raise ValueError("options['adj_type'] should be one of 'prior', 'uniform', 'learned'")
     self.n_layers = options['n_layers']
     self.obj_embed = nn.Linear(options['D_obj'], options['D_obj_embed']).to(self.device)
+    self.obj_reverse_embed = nn.Linear(options['D_obj_embed'], options['D_obj']).to(self.device)
     self.verb_embed = nn.Linear(options['D_verb'], options['D_verb_embed']).to(self.device)
+    self.verb_reverse_embed = nn.Linear(options['D_verb_embed'], options['D_verb']).to(self.device)
     self.Ws_o2v, self.Ws_v2o = {}, {}
-    # self.verb_embed = nn.Linear(options['D_verb'], options['nb_classes']).to(self.device)
     self.verb_expand = nn.Linear(1, options['nb_classes']).to(self.device)
     self.n_top_objs = options['n_top_objs']
-    # TODO: complete GCN
+
     for lid in range(self.n_layers):
       """
       e.g. D_obj = 2048 / D_verb = 2048
@@ -64,43 +66,37 @@ class GCN(nn.Module):
       fm: object features: (batch, n_frames, n_objs, 2248)
       scores: (batch, n_frames, n_objs, nb_obj_classes)
       """
-      obj_feats = fm[:,:,:,:2048]
-      obj_masks = fm[:,:,:,2048:2148]
-      obj_scores = fm[:,:,:,2148:]
+      obj_feats = fm
+      B, T = fm.shape[:2]
+      pred_cls = scores.max(-1)[1]
 
-      frame_feats = (obj_feats.unsqueeze(-2) * scores.unsqueeze(-1)).sum(-3)
-      # fm_obj_embed: (batch, n_frame, n_obj_class, D_obj_embed)
-      fm_obj_embed = self.obj_embed(frame_feats)
+      fm_obj_embed = self.obj_embed(obj_feats)
 
-      # # new_fm shape: (353, 2148)
-      # fm_obj = torch.matmul(cs.transpose(0,1), torch.cat([us, bs], -1)).to(self.device)
-      # # embed features to a lower dimentional space
-      # fm_obj_embed = self.obj_embed(fm_obj)
+      Asub_o2v = torch.index_select(self.A_o2v, 1, pred_cls.view(-1))
+      Asub_o2v = Asub_o2v.view(B, T, self.A_o2v.shape[0], -1)
+      Asub_v2o = torch.index_select(self.A_v2o, 0, pred_cls.view(-1))
+      Asub_v2o = Asub_v2o.view(B, T, -1, self.A_v2o.shape[1])
 
       for l in range(self.n_layers):
         mod_name = 'Ws_o2v_{}'.format(l)
-        fm_verb_embed = self.Ws_o2v[mod_name](torch.matmul(self.A_o2v, fm_obj_embed))
+        fm_verb_embed = self.Ws_o2v[mod_name](torch.matmul(Asub_o2v, fm_obj_embed))
         mod_name = 'Ws_v2o_{}'.format(l)
-        fm_obj_embed = self.Ws_v2o[mod_name](torch.matmul(self.A_v2o, fm_verb_embed))
+        fm_obj_embed = self.Ws_v2o[mod_name](torch.matmul(Asub_v2o, fm_verb_embed))
 
-      # select the top n_top_objs categories
-      # fm_obj_embed.shape: e.g. [8, 4, 353, 128]
-      # most_activated_ids_tensor: e.g. shape = [8, 4, 10]
-      most_activated_ids_tensor = fm_obj_embed.sum(-1).sort(descending=True)[1][:, :, :self.n_top_objs]
-      ti, tj, tk = most_activated_ids_tensor.shape
-      most_activated_ids = self.expand_idx(most_activated_ids_tensor)
-      most_activated = fm_obj_embed[most_activated_ids].reshape(ti, tj, tk, -1)
-      # most_activated = most_activated.type(torch.LongTensor).to(self.device)
-      return most_activated, most_activated_ids_tensor
+      # put objects back into the input embedding space
+      fm_obj_refined = self.obj_reverse_embed(fm_obj_embed)
+
+      return fm_obj_refined, pred_cls
     elif mode == 'verb':
       """
       fm: global context vector: (B, 2048)
       """
       # embed the feature to a lower dimentional space
       fm_verb_embed = self.verb_embed(fm.to(self.device))
-      # fm_verb_embed = self.verb_expand(fm_verb_embed.transpose(0,1))
       fm_verb_embed = self.verb_expand(fm_verb_embed.unsqueeze(-1))
       fm_verb_embed = fm_verb_embed.transpose(-1, -2)
+
+      pdb.set_trace()
 
       for l in range(self.n_layers):
         mod_name = 'Ws_v2o_{}'.format(l)
@@ -110,5 +106,5 @@ class GCN(nn.Module):
       fm_verb_embed = fm_verb_embed.max(1, keepdim=False)[0]
       return fm_verb_embed
     else:
-      raise ValueError("GCN forward mode should be 'obj' or 'verb'. Got {}".format(mode))
+      raise ValueError("GCNv2 forward mode should be 'obj' or 'verb'. Got {}".format(mode))
 

@@ -24,8 +24,8 @@ class FeatsEPIC(VideoDataset):
         super().__init__(options, **kwargs)
 
         # extract
-        self.feats_obj_dir = '/vision2/u/cy3/data/EPIC/fm/objects/' # fm_objects: ndarray (2048, 4, 14, 14)
-        self.feats_ctxt_dir = '/vision2/u/cy3/data/EPIC/fm/context/' # fm_context: ndarray (2048, 4, 7, 7)
+        self.feats_obj_dir = options['feats_obj_dir'] # fm_objects: ndarray (2048, 4, 14, 14)
+        self.feats_ctxt_dir = options['feats_ctxt_dir'] # fm_context: ndarray (2048, 4, 7, 7)
         self.feats_obj_fn_format = os.path.join(self.feats_obj_dir, '{}')
         self.feats_ctxt_fn_format = os.path.join(self.feats_ctxt_dir, '{}')
         self.ts2info_fn = '/vision2/u/bingbin/ORN/meta/ts2info.pkl'

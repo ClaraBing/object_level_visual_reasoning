@@ -16,6 +16,7 @@ from model.orn_two_heads.aggregation_relations import AggregationRelations
 import math
 from model.orn_two_heads.orn import ObjectRelationNetwork
 from model.orn_two_heads.gcn import GCN
+from model.orn_two_heads.gcn_objs import GCNv2
 
 __all__ = [
     'orn_two_heads',
@@ -32,9 +33,9 @@ class TwoHeads(nn.Module):
                  size_2nd_head=14,
                  **kwargs):
         super(TwoHeads, self).__init__()
+        self.gcn_version = options['gcn_version']
         self.use_obj_gcn = use_obj_gcn
         self.use_context_gcn = use_context_gcn
-        self.use_mask = True # TODO: update this
         # Basic settings
         self.num_classes = num_classes
         self.time = time
@@ -51,7 +52,12 @@ class TwoHeads(nn.Module):
         self.cnn.out_dim = 5
 
         if self.use_obj_gcn or self.use_context_gcn:
-          self.gcn = GCN(options)
+          if self.gcn_version == 'v1':
+            self.gcn = GCN(options)
+          elif self.gcn_version == 'v2':
+            self.gcn = GCNv2(options)
+          else:
+            raise ValueError('GCN version can only be "v1" or "v2".')
 
         # # If object head only then freeze the cnn because it has already trained for the object recognition task
         if self.logits_type == 'object':
@@ -72,33 +78,30 @@ class TwoHeads(nn.Module):
         # Max pooling for the ORN module
         self.pool_orn = nn.MaxPool2d((self.time - 1, 1))
 
+        self.size_mask_embedding = 100
+        self.size_obj_embedding = 100
+
         # COCO object features
-        self.size_COCO_object_features = self.size_cnn_features
+        self.size_COCO_object_features = self.size_cnn_features + self.size_mask_embedding
 
         # Prediction of the class of each detected COCO objects (MLP from the pooled features)
         self.COCO_Object_Class_from_Features = Classifier(
-            size_input=self.size_cnn_features,
+            size_input=self.size_COCO_object_features,
             size_output=n_objs)
-        if DEBUG: print('two_heads: COCO classifier: size_input:{} / size_output:{}'.format(self.size_cnn_features, n_objs))
 
-        if self.use_mask:
-          # Embedding of the binary mask by AutoEncoder
-          # Goal -> find the latent space of the shape and location of the objects
-          self.size_mask_embedding = 100
-          self.Encoder_Binary_Mask = EncoderMLP(input_size=self.size_mask * self.size_mask,
-                                                list_hidden_size=[self.size_mask_embedding, self.size_mask_embedding])
+        # Embedding of the binary mask by AutoEncoder
+        # Goal -> find the latent space of the shape and location of the objects
+        self.Encoder_Binary_Mask = EncoderMLP(input_size=self.size_mask * self.size_mask,
+                                              list_hidden_size=[self.size_mask_embedding, self.size_mask_embedding])
 
         # Embedding of the object id
         # Goal -> find the latent space of object id better than just a one hot vector
-        self.size_obj_embedding = 100
         input_size = n_objs
         self.Encoder_COCO_Obj_Class = EncoderMLP(input_size=input_size,
                                                  list_hidden_size=[self.size_obj_embedding, self.size_obj_embedding])
 
         # Object Relational Network (ORN) between coco or pixel objects
         size_object = self.size_COCO_object_features + self.size_obj_embedding
-        if self.use_mask:
-          size_object += self.size_mask_embedding
         if DEBUG:
           print('Two heads: size_object={} / size_COCO_obj={} / size_mask={} / size_obj_embed={}'.format(
             size_object, self.size_COCO_object_features, self.size_mask_embedding, self.size_obj_embedding
@@ -261,30 +264,32 @@ class TwoHeads(nn.Module):
         # Retrieve the feature vector associated to each detected COCO object
         objects_features = self.get_objects_features(fm_objects, masks)
 
+
+        # Reconstruct the binary masks to find the correct embedding (i.e. shape and location of the detected objects)
+        embedding_objects_location = self.Encoder_Binary_Mask(masks)
+        objects_features = torch.cat([objects_features, embedding_objects_location], -1)
+
         # Classify each detected objects to make sure we extract good object descriptors
+        # (NOTE by BB) consider both appearance + shape (i.e. location) in classification
         preds_class_detected_objects = self.COCO_Object_Class_from_Features(objects_features)
 
         if self.use_obj_gcn:
           # object_features: (batch_size, n_frames, n_top, D_obj_embed)
           # top_ids: (batch_size, n_frames, n_top)
-          object_features, top_ids = self.gcn(objects_features, 'obj', preds_class_detected_objects)
-          # print('top_ids:', top_ids.shape)
-        if DEBUG: print('back to object_head (two_heads.py)')
+          if self.gcn_version == 'v1':
+            # collapse objs into a single feature map then inflate to 353xD
+            objects_features, top_ids = self.gcn(objects_features, 'obj', preds_class_detected_objects)
+          elif self.gcn_version == 'v2':
+            # keep indivisual obj feat maps
+            objects_features, top_ids = self.gcn(objects_features, 'obj', preds_class_detected_objects)
 
-        # Reconstruct the binary masks to find the correct embedding (i.e. shape and location of the detected objects)
-        if self.use_mask:
-          embedding_objects_location = self.Encoder_Binary_Mask(masks)
-          if DEBUG: print('mask encoded')
 
         # Reconstruct the COCO class id given the one hot vector
         embedding_obj_id = self.Encoder_COCO_Obj_Class(obj_id)
-        # print('obj_id shape:', obj_id.shape)
-        if DEBUG: print('obj_id encoded')
 
         # Full objects description
-        full_objects = torch.cat([objects_features, embedding_objects_location, embedding_obj_id],
+        full_objects = torch.cat([objects_features, embedding_obj_id],
                                  -1)  # (B,T,K,object_size)
-        if DEBUG: print('full objects:', full_objects.shape)
 
         # Run the Relational Reasoning over the different set of COCO objects
         D = self.size_cnn_features  # 512
@@ -396,9 +401,7 @@ def orn_two_heads(options, **kwargs):
 
     # Features dim
     features_size = 2048 if depth > 34 else 512
-    # size_RN = 512 if depth > 34 else 256
-    # features_size = 512 if options['use_obj_gcn'] else 2048
-    size_RN = 512
+    size_RN = 512 if depth > 34 else 256
 
     # Model
     model = TwoHeads(

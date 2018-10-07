@@ -215,8 +215,10 @@ def write_to_log(log_path, dataset, resume, epoch, metrics, metrics_per_class, e
     with open(file_full_name, 'a+') as f:
         if err_str:
             f.write(err_str+'\n')
-        else:
+        elif metrics is not None:
             f.write('Epoch=%03d, Loss=%.4f, Metric=%.4f\n' % (epoch, metrics[0], metrics[1]))
+        else:
+            f.write('Unknown exception (may be pdb.)')
 
     # Per class metric
     if metrics_per_class is not None:

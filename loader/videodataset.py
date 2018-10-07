@@ -6,7 +6,7 @@ import os
 import random
 from PIL import Image
 import numpy as np
-# import ipdb
+import pdb
 import pickle
 from pycocotools import mask as maskUtils
 import lintel
@@ -235,7 +235,6 @@ class VideoDataset(data.Dataset):
 
         except Exception as e:
             print("mask reading problem: ", e)
-            # ipdb.set_trace()
             np_max_nb_obj[0] = 1.
 
             # Add the background mask
@@ -296,6 +295,10 @@ class VideoDataset(data.Dataset):
         return
 
     @abstractmethod
+    def get_gt_obj(self, id):
+      return
+
+    @abstractmethod
     def get_length(self, id):
         return
 
@@ -326,11 +329,12 @@ class VideoDataset(data.Dataset):
                                                                                        timesteps,
                                                                                        add_background_mask=self.add_background,
                                                                                        start=start)
+        int_gt_obj = self.get_gt_obj(id)
 
         # Data processing on the super_video
         np_clip, np_masks, np_bbox = self.video_transform(np_clip, np_masks, np_bbox)
 
-        return np_clip, np_masks, np_bbox, np_obj_id, np_max_nb_obj
+        return np_clip, np_masks, np_bbox, np_obj_id, np_max_nb_obj, int_gt_obj
 
     def extract_multiple_clips(self, id):
         # Length
@@ -346,7 +350,7 @@ class VideoDataset(data.Dataset):
 
         # Get the gathered data
         (np_clip_union, np_masks_union, np_bbox_union,
-         np_obj_id_union, np_max_nb_obj_union) = self.retrieve_clip_and_masks(id,
+         np_obj_id_union, np_max_nb_obj_union, int_gt_obj) = self.retrieve_clip_and_masks(id,
                                                                               timesteps_union,
                                                                               length,
                                                                               start,
@@ -376,7 +380,7 @@ class VideoDataset(data.Dataset):
         np_obj_id = np.stack(list_np_obj_id)
         np_bbox = np.stack(list_np_bbox)
 
-        return np_clip, np_masks, np_bbox, np_obj_id, np_max_nb_obj_union
+        return np_clip, np_masks, np_bbox, np_obj_id, np_max_nb_obj_union, int_gt_obj
 
     def __getitem__(self, index):
         """
@@ -395,21 +399,28 @@ class VideoDataset(data.Dataset):
 
             # If nb_crops = 1 it is easy
             if self.nb_crops == 1:
-                np_clip, np_masks, np_bbox, np_obj_id, np_max_nb_obj = self.extract_one_clip(id)
+                np_clip, np_masks, np_bbox, np_obj_id, np_max_nb_obj, int_gt_obj = self.extract_one_clip(id)
             else:
-                np_clip, np_masks, np_bbox, np_obj_id, np_max_nb_obj = self.extract_multiple_clips(id)
+                np_clip, np_masks, np_bbox, np_obj_id, np_max_nb_obj, int_gt_obj = self.extract_multiple_clips(id)
 
             # Video id
             np_uint8_id = np.fromstring(str(id), dtype=np.uint8)
+            # print('np_uint8_id:', np_uint8_id.shape)
             torch_id = torch.from_numpy(np_uint8_id)
             torch_id = F.pad(torch_id, (0, 300))[:300]
+            # print('torch_id:', torch_id.shape)
 
             # Torch world
             torch_clip = torch.from_numpy(np_clip)
             torch_masks = torch.from_numpy(np_masks)
             torch_obj_id = torch.from_numpy(np_obj_id)
+            # print('torch_obj_id:', torch_obj_id.shape)
+            # print('torch_obj_id.nonzero():', torch_obj_id.nonzero().sum())
+            # print('torch_obj_id.nonzero():', torch_obj_id.nonzero().shape)
             torch_obj_bboxs = torch.from_numpy(np_bbox)
             torch_max_nb_objs = torch.from_numpy(np_max_nb_obj)
+
+            torch_gt_obj = torch.LongTensor([int_gt_obj])
 
             return {"target": torch_target,
                     "clip": torch_clip,
@@ -417,7 +428,8 @@ class VideoDataset(data.Dataset):
                     "obj_id": torch_obj_id,
                     "obj_bbox": torch_obj_bboxs,
                     "max_nb_obj": torch_max_nb_objs,
-                    "id": torch_id
+                    "id": torch_id,
+                    'gt_obj': torch_gt_obj,
                     }
         except Exception as e:
             raise

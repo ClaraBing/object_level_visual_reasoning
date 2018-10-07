@@ -95,6 +95,8 @@ def take_clip_j(input_var, j):
             input_var_j['id'] = input_var['id']
         elif k == 'max_nb_obj':
             input_var_j['max_nb_obj'] = input_var['max_nb_obj']
+        elif k == 'gt_obj':
+            input_var_j['gt_obj'] = input_var['gt_obj']
         else:
             input_var_j[k] = input_var[k][:, j]
     return input_var_j
@@ -116,13 +118,14 @@ def train(epoch, engine, options, device='cpu'):
     # switch to train mode
     model.train()
 
-    end = time.time()
     print("")
     print('#train_data_loader:', len(data_loader))
     print('print_freq:', options['print_freq'])
 
     all_preds = torch.LongTensor([]).to(device)
     all_gts = torch.LongTensor([]).to(device)
+
+    end = time.time()
     for i, input in enumerate(data_loader):
         if i == 1:
           print('first iteration passed')
@@ -180,6 +183,9 @@ def validate(epoch, engine, options, device='cpu'):
     # create the numpy array for storing the preds and actual target
     dict_id_good_preds, dict_id_failures_preds, dict_id_object = {}, {}, {}
 
+    all_preds = torch.LongTensor([]).to(device)
+    all_gts = torch.LongTensor([]).to(device)
+
     end = time.time()
     nb_crops = data_loader.dataset.nb_crops
     print("")
@@ -198,8 +204,11 @@ def validate(epoch, engine, options, device='cpu'):
                 obj_id = input_var_j['obj_id']
 
                 # compute output
-                output, loss = forward_backward(model, input_var_j, criterion, None, device)
+                output, loss, preds, gts = forward_backward(model, input_var_j, criterion, None, device)
                 # ipdb.set_trace()
+
+                all_preds = torch.cat([all_preds, preds])
+                all_gts = torch.cat([all_gts, gts])
 
                 # aggreg by summing
                 if output_aggreg is None:
@@ -252,6 +261,12 @@ def validate(epoch, engine, options, device='cpu'):
 
     print(' * Metric {metric_avg:.3f}'.format(metric_avg=metric_avg))
     sys.stdout.flush()
+
+    n_correct = (all_gts == all_preds).sum()
+    top1 = int(n_correct) / len(all_gts)
+    print('Top1:', top1)
+
+    pdb.set_trace()
 
     # Pandas frame - good & failure
     df_good = pandas.DataFrame.from_dict(dict_id_good_preds)
