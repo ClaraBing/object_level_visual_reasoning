@@ -1,3 +1,4 @@
+import os
 import argparse
 import model.models as models
 from inference import inference
@@ -11,6 +12,9 @@ if __name__ == '__main__':
 
     # Parser
     parser = argparse.ArgumentParser(description='Pytorch implementation: Object level visual reasoning in videos')
+    parser.add_argument('--machine', type=str, required=True, help="Machine on which the experiment is running. e.g. macondo2")
+    parser.add_argument('--gpu-id', type=int, required=True, help='GPU Id on which the experiment is running. Assuming single GPU for now.')
+    parser.add_argument('--task-id', type=int, required=True, help='Task id of the experiment on a particular GPU.')
     parser.add_argument('--device', default='cuda:0',
                         help="A string specifying the device on which models and data reside. 'cpu' or 'cuda:x'")
     parser.add_argument('--arch', '-a', metavar='ARCH',
@@ -26,7 +30,11 @@ if __name__ == '__main__':
     parser.add_argument('--adj-type', type=str, default='uniform', choices=['prior', 'uniform', 'learned'],
                         help="Type of adjacency matrix for GCN. Choose among 'prior', 'uniform', or 'learned'.")
     parser.add_argument('--use-flow', type=int, default=0, help='whether to add a branch for optical flow')
-    parser.add_argument('--use-wv-weights', type=int, default=0, help='whether to use word vectors as classifier weights.')
+    parser.add_argument('--two-layer-context', type=int, default=0, help='Whether to use 2 layers in the context classification head.')
+    parser.add_argument('--use-wv-weights', type=int, default=0,
+                        help='Whether to use word vectors as classifier weights. Valid only when "two-layer-context is 1".')
+    parser.add_argument('--freeze-wv-weights', type=int, default=1,
+                        help='Whether to train the last layer of the context classifier. Valid only when "use-wv-weights" is 1.')
     parser.add_argument('--depth', default=50, type=int,
                         metavar='D', help='depth of the backbone')
     parser.add_argument('--dataset', metavar='D',
@@ -100,6 +108,9 @@ if __name__ == '__main__':
 
     # Dict
     options = vars(args)
+    options['ckpt_file'] = os.path.join(
+        options['resume'],
+        '{}_gpu{}_task{}.exp'.format(options['machine'], options['gpu_id'], options['task_id']))
 
     print('\nOptions:')
     for key in options:

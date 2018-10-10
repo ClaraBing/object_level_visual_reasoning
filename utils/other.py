@@ -143,7 +143,10 @@ def load_from_dir(model, optimizer, options):
     epoch = 0
     if options['resume']:
         if os.path.isdir(options['resume']):
-            ckpt_resume = os.path.join(options['resume'], options['ckpt_name'])
+            # ckpt_resume = os.path.join(options['resume'], options['ckpt_name'])
+            with open(options['ckpt_file'], 'r') as fin:
+              ckpt_resume = fin.readline().strip()
+              ckpt_resume = os.path.join(options['resume'], ckpt_resume)
             if not os.path.isfile(ckpt_resume):
               untarred = ckpt_resume.replace('.tar', '')
               if os.path.isfile(untarred):

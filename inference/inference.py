@@ -4,6 +4,7 @@ import os
 import shutil
 import time
 from datetime import datetime
+import pickle
 
 import torch
 import torch.nn as nn
@@ -92,15 +93,19 @@ def main(options):
         if options['save_token']:
           save_dir += '_' + options['save_token']
         if os.path.exists(save_dir):
-          now = datetime.now()
-          save_dir = save_dir + '_{:02d}{:02d}{:02d}{:02d}{:02d}'.format(now.month, now.day, now.hour, now.minute, now.second)
+          overwrite = input('{} already exists. Do you want to overwrite (append datetime if not)? (y/n)'.format(save_dir))
+          if 'n' in overwrite or 'N' in overwrite:
+            now = datetime.now()
+            save_dir = save_dir + '_{:02d}{:02d}{:02d}{:02d}{:02d}'.format(now.month, now.day, now.hour, now.minute, now.second)
           # proceed = input('WARNING: Dir exists: {}\nWould you like to proceed (may overwrite previous ckpts) [y/N]?'.format(save_dir))
           # if 'n' in proceed or 'N' in proceed:
           #   print('Do not overwrite -- Exiting.')
           #   exit(0)
-        os.makedirs(save_dir)
+        os.makedirs(save_dir, exist_ok=True)
         print('ckpt save_dir:', save_dir)
         shutil.copy(os.path.join(os.getcwd(), 'training_epic.sh'), os.path.join(save_dir))
+        with open(os.path.join(save_dir, 'options.pkl'), 'wb') as handle:
+          pickle.dump(options, handle)
 
         log_path='train_{:s}_gcnObj{}_gcnContext{}.log'.format(options['dataset'], options['use_obj_gcn'], options['use_context_gcn'])
 
@@ -125,6 +130,7 @@ def main(options):
                     best_metric_val = max(metric_val, best_metric_val)
     
                 # save checkpoint
+                curr_filename = 'ckpt_epoch{:d}.pth'.format(epoch) 
                 save_checkpoint({
                     'epoch': epoch,
                     'arch': options['arch'],
@@ -134,7 +140,11 @@ def main(options):
                     'loss_history': loss_train_history,
                     'metric_history': metric_train_history,
                 }, is_best, save_dir,
-                filename='ckpt_epoch{:d}.pth'.format(epoch))
+                filename=curr_filename)
+                best_ckpt_path = os.path.join(save_dir, curr_filename.replace('.pth', '_best.pth'))
+                with open(options['ckpt_file'], 'w') as fin:
+                  fin.write(best_ckpt_path)
+                  fin.flush()
             except Exception as e:
                 write_to_log(log_path, train_dataset.dataset, save_dir, epoch, None, None, err_str=str(e))
                 print('!!!!!\nException: written to log file {}\n!!!!!'.format(log_path))

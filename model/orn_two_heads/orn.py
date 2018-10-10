@@ -2,8 +2,7 @@ import torch
 import torch.nn as nn
 import random
 from model.orn_two_heads.encoder import EncoderMLP
-
-DEBUG = False
+import pdb
 
 
 class ObjectRelationNetwork(nn.Module):
@@ -26,7 +25,6 @@ class ObjectRelationNetwork(nn.Module):
         list_input_mlp, input_mlp = [], None
         K = O_1.size(1)
         for k in range(K):
-            if DEBUG: print('create_inter_object_act: k =', k)
             O_1_k = O_2[:, k].unsqueeze(1).repeat(1, K, 1)
             O_1_k_input_relation = torch.cat([O_1_k, O_2], dim=2)
             list_input_mlp.append(O_1_k_input_relation)
@@ -51,10 +49,6 @@ class ObjectRelationNetwork(nn.Module):
 
     def create_input_mlp(self, O_t_1, O_t, D):
         K = O_t.size(1)
-
-        if DEBUG: print('two_heads: create_input_mlp:')
-        if DEBUG: print('  O_t_1:', O_t_1.shape)
-        if DEBUG: print('  O_t:', O_t.shape)
 
         # Input
         input_mlp = self.create_inter_object_cat(O_t_1, O_t)

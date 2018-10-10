@@ -38,7 +38,9 @@ class TwoHeads(nn.Module):
         self.use_obj_gcn = use_obj_gcn
         self.use_context_gcn = use_context_gcn
         self.use_flow = options['use_flow']
+        self.two_layer_context = options['two_layer_context']
         self.use_wv_weights = options['use_wv_weights']
+        self.freeze_wv_weights = options['freeze_wv_weights']
         # Basic settings
         self.num_classes = num_classes
         self.time = time
@@ -139,16 +141,19 @@ class TwoHeads(nn.Module):
         ## Final classification
         self.fc_classifier_object = nn.Linear(self.size_relation_features, self.num_classes)
         # self.fc_classifier_context = nn.Linear(options['D_verb_embed'], self.num_classes) if self.use_context_gcn else nn.Linear(self.size_cnn_features, self.num_classes)
-        if self.use_wv_weights:
+        if self.two_layer_context:
           self.fc_classifier_context = nn.Sequential(
             nn.Linear(self.size_cnn_features, 300),
             nn.Linear(300, self.num_classes, bias=False)
           )
-          wv_weights = np.load('/vision2/u/bingbin/ORN/meta/wv_weights.npy')
-          self.fc_classifier_context[1].weight.data = torch.Tensor(wv_weights)
-          # freeze the classifier
-          for param in self.fc_classifier_context[1].parameters():
-            param.requires_grad = False
+          if self.use_wv_weights:
+            wv_weights = np.load('/vision2/u/bingbin/ORN/meta/wv_weights.npy')
+            self.fc_classifier_context[1].weight.data = torch.Tensor(wv_weights)
+
+            if self.freeze_wv_weights:
+              # freeze the classifier
+              for param in self.fc_classifier_context[1].parameters():
+                param.requires_grad = False
         else:
           self.fc_classifier_context = nn.Linear(self.size_cnn_features, self.num_classes)
 
