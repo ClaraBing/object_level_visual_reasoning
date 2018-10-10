@@ -14,6 +14,7 @@ from model.backbone.resnet.bottleneck import Bottleneck2D, Bottleneck3D, Bottlen
 from model.backbone.resnet.basicblock import BasicBlock2D, BasicBlock3D, BasicBlock2_1D
 from model.orn_two_heads.aggregation_relations import AggregationRelations
 import math
+from functools import reduce
 from model.orn_two_heads.orn import ObjectRelationNetwork
 from model.orn_two_heads.gcn import GCN
 from model.orn_two_heads.gcn_objs import GCNv2
@@ -22,7 +23,6 @@ __all__ = [
     'orn_two_heads',
 ]
 
-DEBUG = False
 CHECK_IDS = True
 
 
@@ -33,9 +33,12 @@ class TwoHeads(nn.Module):
                  size_2nd_head=14,
                  **kwargs):
         super(TwoHeads, self).__init__()
+        self.use_obj_rel = options['use_obj_rel']
         self.gcn_version = options['gcn_version']
         self.use_obj_gcn = use_obj_gcn
         self.use_context_gcn = use_context_gcn
+        self.use_flow = options['use_flow']
+        self.use_wv_weights = options['use_wv_weights']
         # Basic settings
         self.num_classes = num_classes
         self.time = time
@@ -82,7 +85,9 @@ class TwoHeads(nn.Module):
         self.size_obj_embedding = 100
 
         # COCO object features
-        self.size_COCO_object_features = self.size_cnn_features + self.size_mask_embedding
+        self.size_COCO_object_features = self.size_cnn_features
+        if self.use_obj_gcn and self.gcn_version=='v2':
+          self.size_COCO_object_features += self.size_mask_embedding
 
         # Prediction of the class of each detected COCO objects (MLP from the pooled features)
         self.COCO_Object_Class_from_Features = Classifier(
@@ -101,17 +106,20 @@ class TwoHeads(nn.Module):
                                                  list_hidden_size=[self.size_obj_embedding, self.size_obj_embedding])
 
         # Object Relational Network (ORN) between coco or pixel objects
-        size_object = self.size_COCO_object_features + self.size_obj_embedding
-        if DEBUG:
-          print('Two heads: size_object={} / size_COCO_obj={} / size_mask={} / size_obj_embed={}'.format(
-            size_object, self.size_COCO_object_features, self.size_mask_embedding, self.size_obj_embedding
-            ))
+        if self.use_obj_gcn and self.gcn_version == 'v2':
+          size_object = self.size_COCO_object_features + self.size_obj_embedding
+        else:
+          size_object = self.size_COCO_object_features + self.size_obj_embedding + self.size_mask_embedding
 
         # ORN
         list_size_hidden_layers = [self.size_RN, self.size_RN, self.size_RN]
-        self.ORN = ObjectRelationNetwork(size_object=size_object,
-                                         list_hidden_layers_size=list_size_hidden_layers
-                                         )
+        if self.use_obj_rel:
+          self.ORN = ObjectRelationNetwork(size_object=size_object,
+                                           list_hidden_layers_size=list_size_hidden_layers
+                                           )
+        else:
+          self.ORN = EncoderMLP(input_size=size_object,
+                                list_hidden_size=list_size_hidden_layers)
         # Aggregation over the
         self.AggregationRelations = AggregationRelations()
 
@@ -130,7 +138,19 @@ class TwoHeads(nn.Module):
 
         ## Final classification
         self.fc_classifier_object = nn.Linear(self.size_relation_features, self.num_classes)
-        self.fc_classifier_context = nn.Linear(options['D_verb_embed'], self.num_classes) if self.use_context_gcn else nn.Linear(self.size_cnn_features, self.num_classes)
+        # self.fc_classifier_context = nn.Linear(options['D_verb_embed'], self.num_classes) if self.use_context_gcn else nn.Linear(self.size_cnn_features, self.num_classes)
+        if self.use_wv_weights:
+          self.fc_classifier_context = nn.Sequential(
+            nn.Linear(self.size_cnn_features, 300),
+            nn.Linear(300, self.num_classes, bias=False)
+          )
+          wv_weights = np.load('/vision2/u/bingbin/ORN/meta/wv_weights.npy')
+          self.fc_classifier_context[1].weight.data = torch.Tensor(wv_weights)
+          # freeze the classifier
+          for param in self.fc_classifier_context[1].parameters():
+            param.requires_grad = False
+        else:
+          self.fc_classifier_context = nn.Linear(self.size_cnn_features, self.num_classes)
 
 
     def get_objects_features(self, fm, masks):
@@ -267,7 +287,8 @@ class TwoHeads(nn.Module):
 
         # Reconstruct the binary masks to find the correct embedding (i.e. shape and location of the detected objects)
         embedding_objects_location = self.Encoder_Binary_Mask(masks)
-        objects_features = torch.cat([objects_features, embedding_objects_location], -1)
+        if self.use_obj_gcn and self.gcn_version == 'v2':
+          objects_features = torch.cat([objects_features, embedding_objects_location], -1)
 
         # Classify each detected objects to make sure we extract good object descriptors
         # (NOTE by BB) consider both appearance + shape (i.e. location) in classification
@@ -288,16 +309,25 @@ class TwoHeads(nn.Module):
         embedding_obj_id = self.Encoder_COCO_Obj_Class(obj_id)
 
         # Full objects description
-        full_objects = torch.cat([objects_features, embedding_obj_id],
-                                 -1)  # (B,T,K,object_size)
+        if self.use_obj_gcn and self.gcn_version == 'v2':
+          full_objects = torch.cat([objects_features, embedding_obj_id],
+                                   -1)  # (B,T,K,object_size)
+        else:
+          full_objects = torch.cat([objects_features, embedding_objects_location, embedding_obj_id], -1)
 
-        # Run the Relational Reasoning over the different set of COCO objects
-        D = self.size_cnn_features  # 512
-        all_e, all_is_obj = self.ORN(full_objects, D)  # [B, T-1, K*K, D]
 
-        # Get only interactions where at least one obj is involved (for COCO only)
-        all_is_obj = all_is_obj.unsqueeze(-1)
-        all_e *= all_is_obj
+        if self.use_obj_rel:
+          # Run the Relational Reasoning over the different set of COCO objects
+          D = self.size_cnn_features  # 512
+          all_e, all_is_obj = self.ORN(full_objects, D)  # [B, T-1, K*K, D]
+
+          # Get only interactions where at least one obj is involved (for COCO only)
+          all_is_obj = all_is_obj.unsqueeze(-1)
+          all_e *= all_is_obj
+
+        else:
+          # single objects embed + pool
+          all_e = self.ORN(full_objects)
 
         # Aggregation of the COCO relations
         orn_aggregated = self.AggregationRelations(all_e)
@@ -334,13 +364,12 @@ class TwoHeads(nn.Module):
         return masks_squeezed, obj_id_squeezed, bbox_squeezed
 
     def final_classification(self, context_representation, object_representation):
+        ret = []
+        if object_representation is not None:
+          ret += self.fc_classifier_object(object_representation),
         if context_representation is not None:
-            # print('final_classification:')
-            # print('  object_representation:', object_representation.shape)
-            # print('  context_representation:', context_representation.shape)
-            return self.fc_classifier_object(object_representation) + self.fc_classifier_context(context_representation)
-        else:
-            return self.fc_classifier_object(object_representation)
+          ret += self.fc_classifier_context(context_representation),
+        return reduce(lambda x,y:x+y, ret)
 
     def forward(self, x):
         """Forward pass from a tensor of size (B,C,T,W,H)"""
@@ -355,17 +384,17 @@ class TwoHeads(nn.Module):
           B = clip.size(0)  # batch size
           T = clip.size(2)  # number of timesteps in the sequence
           # Get the two feature maps: context and object reasoning
+          # TODO: add flow to x
           fm_context, fm_objects = self.cnn.get_two_heads_feature_maps(x, T=T, out_dim=5,
                                                                        heads_type=self.logits_type)
         else:
           fm_context, fm_objects = x['fm_context'], x['fm_obj']
           B = fm_context.size(0)
 
-        # pdb.set_trace()
         K = masks.size(2)  # number of objects
 
         # Init returned variable
-        context_representation, object_representation, preds_class_detected_objects = None, None, None
+        context_representation, object_representation, preds_class_detected_objects, gcn_ids = None, None, None, None
 
         # HEADS
         if 'object' in self.logits_type:
@@ -373,6 +402,9 @@ class TwoHeads(nn.Module):
 
         if 'context' in self.logits_type:
             context_representation = self.context_head(fm_context, B=B)
+
+        if self.use_flow:
+            flow_representation = self.context_head(fm_flow_context, B=B)
 
         # Final classification
         logits = self.final_classification(context_representation, object_representation)

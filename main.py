@@ -19,10 +19,14 @@ if __name__ == '__main__':
                         help='model architecture: ' +
                              ' | '.join(model_names) +
                              ' (default: orn_two_heads')
+    parser.add_argument('--use-obj-rel', type=int, default=1)
+    parser.add_argument('--gcn-version', type=str, choices=['None', 'v1', 'v2'], default='v1')
     parser.add_argument('--use-obj-gcn', type=int, choices=[0,1])
     parser.add_argument('--use-context-gcn', type=int, choices=[0,1])
     parser.add_argument('--adj-type', type=str, default='uniform', choices=['prior', 'uniform', 'learned'],
                         help="Type of adjacency matrix for GCN. Choose among 'prior', 'uniform', or 'learned'.")
+    parser.add_argument('--use-flow', type=int, default=0, help='whether to add a branch for optical flow')
+    parser.add_argument('--use-wv-weights', type=int, default=0, help='whether to use word vectors as classifier weights.')
     parser.add_argument('--depth', default=50, type=int,
                         metavar='D', help='depth of the backbone')
     parser.add_argument('--dataset', metavar='D',
@@ -34,6 +38,8 @@ if __name__ == '__main__':
     parser.add_argument('--root', metavar='D',
                         default='./data/vlog',
                         help='location of the dataset directory')
+    parser.add_argument('--feats-obj-dir', type=str, default='/vision2/u/cy3/data/EPIC/fm/objects/')
+    parser.add_argument('--feats-ctxt-dir', type=str, default='/vision2/u/cy3/data/EPIC/fm/context/')
     parser.add_argument('-b', '--batch-size', default=4, type=int,
                         metavar='B', help='batch size')
     parser.add_argument('-t', '--t', default=2, type=int,
@@ -44,7 +50,7 @@ if __name__ == '__main__':
     parser.add_argument('--nb-obj-classes', type=int, default=353, help='number of obj classes. 353 for EPIC.')
     parser.add_argument('--nb-crops', type=int, default=10, metavar='N',
                         help='number of crops while testing')
-    parser.add_argument('--lr', type=float, default=0.0001, metavar='LR',
+    parser.add_argument('--lr', type=float, default=0.0005, metavar='LR',
                         help='learning rate')
     parser.add_argument('--wd', type=float, default=1e-5,
                         help='weight decay')
@@ -54,12 +60,11 @@ if __name__ == '__main__':
                         help='frequence of printing in the log')
     parser.add_argument('--resume',
                         default='/tmp/my_resume',
-                        # default='./resume/vlog',
                         type=str, metavar='PATH',
                         help='path to latest checkpoint')
     parser.add_argument('--save-token', default='', type=str, 
                         help='special (hopefully uniq) token as notes for different experiment settings')
-    parser.add_argument('--ckpt-name', default='model_best.pth.tar', type=str, help='checkpoint filename (w/o dir path)')
+    parser.add_argument('--ckpt-name', default='model_best.pth', type=str, help='checkpoint filename (w/o dir path)')
     parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                         help='evaluation mode')
     parser.add_argument('--cuda', dest='cuda', action='store_true',
@@ -83,10 +88,10 @@ if __name__ == '__main__':
                         default='2D',
                         help='Nature of the residual block of the object head: Bi where can be 2D, 3D or 2.5D')
     # GCN model params
-    parser.add_argument('--D-obj', type=int, default=2048)
+    parser.add_argument('--D-obj', type=int, default=2048, help='obj feats (excluding embedded mask)')
     parser.add_argument('--D-verb', type=int, default=2048),
-    parser.add_argument('--D-obj-embed', type=int, default=128),
-    parser.add_argument('--D-verb-embed', type=int, default=128),
+    parser.add_argument('--D-obj-embed', type=int, default=32),
+    parser.add_argument('--D-verb-embed', type=int, default=32),
     parser.add_argument('--n-layers', type=int, default=2),
     parser.add_argument('--n-top-objs', type=int, default=10),
 
