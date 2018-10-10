@@ -23,8 +23,9 @@ class GCNv2(nn.Module):
     else:
       raise ValueError("options['adj_type'] should be one of 'prior', 'uniform', 'learned'")
     self.n_layers = options['n_layers']
-    self.obj_embed = nn.Linear(options['D_obj'], options['D_obj_embed']).to(self.device)
-    self.obj_reverse_embed = nn.Linear(options['D_obj_embed'], options['D_obj']).to(self.device)
+    self.mask_embed_dim = 100
+    self.obj_embed = nn.Linear(options['D_obj']+self.mask_embed_dim, options['D_obj_embed']).to(self.device)
+    self.obj_reverse_embed = nn.Linear(options['D_obj_embed'], options['D_obj']+self.mask_embed_dim).to(self.device)
     self.verb_embed = nn.Linear(options['D_verb'], options['D_verb_embed']).to(self.device)
     self.verb_reverse_embed = nn.Linear(options['D_verb_embed'], options['D_verb']).to(self.device)
     self.Ws_o2v, self.Ws_v2o = {}, {}
@@ -96,7 +97,7 @@ class GCNv2(nn.Module):
       fm_verb_embed = self.verb_expand(fm_verb_embed.unsqueeze(-1))
       fm_verb_embed = fm_verb_embed.transpose(-1, -2)
 
-      pdb.set_trace()
+      # pdb.set_trace()
 
       for l in range(self.n_layers):
         mod_name = 'Ws_v2o_{}'.format(l)
@@ -104,6 +105,7 @@ class GCNv2(nn.Module):
         mod_name = 'Ws_o2v_{}'.format(l)
         fm_verb_embed = self.Ws_o2v[mod_name](torch.matmul(self.A_o2v, fm_obj_embed))
       fm_verb_embed = fm_verb_embed.max(1, keepdim=False)[0]
+      fm_verb_refined = self.verb_reverse_embed(fm_verb_embed)
       return fm_verb_embed
     else:
       raise ValueError("GCNv2 forward mode should be 'obj' or 'verb'. Got {}".format(mode))

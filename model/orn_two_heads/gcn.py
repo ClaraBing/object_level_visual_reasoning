@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from utils.graph import build_vog
+import pdb
 
 class GCN(nn.Module):
   def __init__(self, options):
@@ -23,7 +24,9 @@ class GCN(nn.Module):
       raise ValueError("options['adj_type'] should be one of 'prior', 'uniform', 'learned'")
     self.n_layers = options['n_layers']
     self.obj_embed = nn.Linear(options['D_obj'], options['D_obj_embed']).to(self.device)
+    self.obj_reverse_embed = nn.Linear(options['D_obj_embed'], options['D_obj']).to(self.device)
     self.verb_embed = nn.Linear(options['D_verb'], options['D_verb_embed']).to(self.device)
+    self.verb_reverse_embed = nn.Linear(options['D_verb_embed'], options['D_verb']).to(self.device)
     self.Ws_o2v, self.Ws_v2o = {}, {}
     # self.verb_embed = nn.Linear(options['D_verb'], options['nb_classes']).to(self.device)
     self.verb_expand = nn.Linear(1, options['nb_classes']).to(self.device)
@@ -65,10 +68,10 @@ class GCN(nn.Module):
       scores: (batch, n_frames, n_objs, nb_obj_classes)
       """
       obj_feats = fm[:,:,:,:2048]
-      obj_masks = fm[:,:,:,2048:2148]
-      obj_scores = fm[:,:,:,2148:]
+      n_top_objs = fm.shape[2]
 
       frame_feats = (obj_feats.unsqueeze(-2) * scores.unsqueeze(-1)).sum(-3)
+      # pdb.set_trace()
       # fm_obj_embed: (batch, n_frame, n_obj_class, D_obj_embed)
       fm_obj_embed = self.obj_embed(frame_feats)
 
@@ -86,12 +89,14 @@ class GCN(nn.Module):
       # select the top n_top_objs categories
       # fm_obj_embed.shape: e.g. [8, 4, 353, 128]
       # most_activated_ids_tensor: e.g. shape = [8, 4, 10]
-      most_activated_ids_tensor = fm_obj_embed.sum(-1).sort(descending=True)[1][:, :, :self.n_top_objs]
+      most_activated_ids_tensor = fm_obj_embed.sum(-1).sort(descending=True)[1][:, :, :n_top_objs]
+      # pdb.set_trace()
       ti, tj, tk = most_activated_ids_tensor.shape
       most_activated_ids = self.expand_idx(most_activated_ids_tensor)
       most_activated = fm_obj_embed[most_activated_ids].reshape(ti, tj, tk, -1)
+      refined = self.obj_reverse_embed(most_activated)
       # most_activated = most_activated.type(torch.LongTensor).to(self.device)
-      return most_activated, most_activated_ids_tensor
+      return refined, most_activated_ids_tensor
     elif mode == 'verb':
       """
       fm: global context vector: (B, 2048)
@@ -108,7 +113,8 @@ class GCN(nn.Module):
         mod_name = 'Ws_o2v_{}'.format(l)
         fm_verb_embed = self.Ws_o2v[mod_name](torch.matmul(self.A_o2v, fm_obj_embed))
       fm_verb_embed = fm_verb_embed.max(1, keepdim=False)[0]
-      return fm_verb_embed
+      refined = self.verb_reverse_embed(fm_verb_embed)
+      return refined
     else:
       raise ValueError("GCN forward mode should be 'obj' or 'verb'. Got {}".format(mode))
 
