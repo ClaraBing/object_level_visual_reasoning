@@ -1,4 +1,3 @@
-from model import models
 import argparse
 import os
 import shutil
@@ -7,6 +6,8 @@ from datetime import datetime
 import pickle
 
 import torch
+torch.manual_seed(95)
+torch.cuda.manual_seed(95)
 import torch.nn as nn
 import torch.nn.parallel
 import torch.optim
@@ -17,6 +18,7 @@ from inference.train_val import *
 # import ipdb
 from model import models
 from utils.other import *
+
 
 
 def main(options):
@@ -43,11 +45,12 @@ def main(options):
     nb_total_params = count_nb_params(model.parameters())
     nb_trainable_params = count_nb_params(filter(lambda p: p.requires_grad, model.parameters()))
     ratio = float(nb_trainable_params / nb_total_params) * 100.
-    print("\n* Parameter numbers : {} ({}) - {ratio:.2f}% of the weights are trainable".format(
-        print_number(nb_total_params),
-        print_number(nb_trainable_params),
-        ratio=ratio
-    ))
+    if not options['evaluate']:
+      print("\n* Parameter numbers : {} ({}) - {ratio:.2f}% of the weights are trainable".format(
+          print_number(nb_total_params),
+          print_number(nb_trainable_params),
+          ratio=ratio
+      ))
 
     # Optimizer
     optimizer = torch.optim.Adam(trainable_params, options['lr'])

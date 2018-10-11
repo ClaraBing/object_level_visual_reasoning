@@ -1,4 +1,8 @@
 import os
+import numpy as np
+np.random.seed(95)
+import random
+random.seed(95)
 import argparse
 import model.models as models
 from inference import inference
@@ -58,7 +62,7 @@ if __name__ == '__main__':
     parser.add_argument('--nb-obj-classes', type=int, default=353, help='number of obj classes. 353 for EPIC.')
     parser.add_argument('--nb-crops', type=int, default=10, metavar='N',
                         help='number of crops while testing')
-    parser.add_argument('--lr', type=float, default=0.0005, metavar='LR',
+    parser.add_argument('--lr', type=float, default=0.0001, metavar='LR',
                         help='learning rate')
     parser.add_argument('--wd', type=float, default=1e-5,
                         help='weight decay')
