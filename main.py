@@ -27,6 +27,8 @@ if __name__ == '__main__':
                         help='model architecture: ' +
                              ' | '.join(model_names) +
                              ' (default: orn_two_heads')
+    parser.add_argument('--use-vo-branch', type=int, default=0,
+                        help='Whether to add another branch for verb-object. Diff from GCN.')
     parser.add_argument('--use-obj-rel', type=int, default=1)
     parser.add_argument('--gcn-version', type=str, choices=['None', 'v1', 'v2'], default='v1')
     parser.add_argument('--use-obj-gcn', type=int, choices=[0,1])
@@ -41,6 +43,8 @@ if __name__ == '__main__':
                         help='Whether to train the last layer of the context classifier. Valid only when "use-wv-weights" is 1.')
     parser.add_argument('--depth', default=50, type=int,
                         metavar='D', help='depth of the backbone')
+    parser.add_argument('--loss', default='ce', choices=['ce', 'ce+ce'],
+                        help='Whether to include obj loss.')
     parser.add_argument('--dataset', metavar='D',
                         default='vlog',
                         help='dataset name')

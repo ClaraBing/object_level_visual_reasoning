@@ -18,6 +18,7 @@ from functools import reduce
 from model.orn_two_heads.orn import ObjectRelationNetwork
 from model.orn_two_heads.gcn import GCN
 from model.orn_two_heads.gcn_objs import GCNv2
+from model.orn_two_heads.vo import VO
 
 __all__ = [
     'orn_two_heads',
@@ -34,6 +35,7 @@ class TwoHeads(nn.Module):
                  **kwargs):
         super(TwoHeads, self).__init__()
         self.use_obj_rel = options['use_obj_rel']
+        self.use_vo_branch = options['use_vo_branch']
         self.gcn_version = options['gcn_version']
         self.use_obj_gcn = use_obj_gcn
         self.use_context_gcn = use_context_gcn
@@ -63,6 +65,7 @@ class TwoHeads(nn.Module):
             self.gcn = GCNv2(options)
           else:
             raise ValueError('GCN version can only be "v1" or "v2".')
+
 
         # # If object head only then freeze the cnn because it has already trained for the object recognition task
         if self.logits_type == 'object':
@@ -125,6 +128,8 @@ class TwoHeads(nn.Module):
         # Aggregation over the
         self.AggregationRelations = AggregationRelations()
 
+
+
         # RNN or AVG
         self.f_orn = f_orn
         # RNN Object
@@ -156,6 +161,10 @@ class TwoHeads(nn.Module):
                 param.requires_grad = False
         else:
           self.fc_classifier_context = nn.Linear(self.size_cnn_features, self.num_classes)
+
+        if 'vo' in self.logits_type:
+          self.vo_head = VO(options, size_object=size_object)
+          self.fc_classifier_vo = nn.Linear(self.size_cnn_features+options['D_obj_embed'], 1)
 
 
     def get_objects_features(self, fm, masks):
@@ -272,6 +281,7 @@ class TwoHeads(nn.Module):
         else:
             return np.argmax(one_hot)
 
+
     def context_head(self, fm_context, B):
         # print('context_head')
         # print('fm_context:', fm_context.shape)
@@ -287,6 +297,7 @@ class TwoHeads(nn.Module):
 
     def object_head(self, fm_objects, masks, obj_id, B):
         # Retrieve the feature vector associated to each detected COCO object
+        # pdb.set_trace()
         objects_features = self.get_objects_features(fm_objects, masks)
 
 
@@ -324,7 +335,7 @@ class TwoHeads(nn.Module):
         if self.use_obj_rel:
           # Run the Relational Reasoning over the different set of COCO objects
           D = self.size_cnn_features  # 512
-          all_e, all_is_obj = self.ORN(full_objects, D)  # [B, T-1, K*K, D]
+          all_e, all_is_obj = self.ORN(full_objects, D, obj_id)  # [B, T-1, K*K, D]
 
           # Get only interactions where at least one obj is involved (for COCO only)
           all_is_obj = all_is_obj.unsqueeze(-1)
@@ -349,7 +360,7 @@ class TwoHeads(nn.Module):
         else:
             raise Exception
 
-        return object_representation, preds_class_detected_objects, top_ids if self.use_obj_gcn else []
+        return full_objects, object_representation, all_e, preds_class_detected_objects, top_ids if self.use_obj_gcn else []
 
     def add(self, logits, logits_head):
         if logits is None:
@@ -368,12 +379,17 @@ class TwoHeads(nn.Module):
 
         return masks_squeezed, obj_id_squeezed, bbox_squeezed
 
-    def final_classification(self, context_representation, object_representation):
+    def final_classification(self, context_representation, object_representation, vo_representation):
+        # pdb.set_trace()
         ret = []
+
         if object_representation is not None:
           ret += self.fc_classifier_object(object_representation),
         if context_representation is not None:
           ret += self.fc_classifier_context(context_representation),
+        if vo_representation is not None:
+          ret += self.fc_classifier_vo(vo_representation).squeeze(-1),
+
         return reduce(lambda x,y:x+y, ret)
 
     def forward(self, x):
@@ -399,20 +415,25 @@ class TwoHeads(nn.Module):
         K = masks.size(2)  # number of objects
 
         # Init returned variable
-        context_representation, object_representation, preds_class_detected_objects, gcn_ids = None, None, None, None
+        context_representation, object_representation, vo_representation = None, None, None
+        preds_class_detected_objects, gcn_ids = None, None
 
+        # pdb.set_trace()
         # HEADS
         if 'object' in self.logits_type:
-            object_representation, preds_class_detected_objects, gcn_ids = self.object_head(fm_objects, masks, obj_id, B=B)
+            full_objects, object_representation, all_e, preds_class_detected_objects, gcn_ids = self.object_head(fm_objects, masks, obj_id, B=B)
 
         if 'context' in self.logits_type:
             context_representation = self.context_head(fm_context, B=B)
+
+        if 'vo' in self.logits_type:
+            vo_representation = self.vo_head(full_objects, context_representation, obj_id)
 
         if self.use_flow:
             flow_representation = self.context_head(fm_flow_context, B=B)
 
         # Final classification
-        logits = self.final_classification(context_representation, object_representation)
+        logits = self.final_classification(context_representation, object_representation, vo_representation)
 
         return logits, preds_class_detected_objects, gcn_ids
 

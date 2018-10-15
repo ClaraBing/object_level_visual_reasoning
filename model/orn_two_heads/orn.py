@@ -60,18 +60,26 @@ class ObjectRelationNetwork(nn.Module):
 
         return input_mlp, is_objects
 
-    def compute_O_O_interaction(self, sets_of_objects, t, previous_T, D, sampling=False):
+    def compute_O_O_interaction(self, sets_of_objects, t, previous_T, D, obj_id, sampling=False):
+        """
+        e.g.
+        sets_of_objects: [batch, n_frames, n_frame_objs, 2248]
+        obj_id: [batch, n_frames, n_frame_objs, 353]
+        """
 
         # Object set (the reference one)
         O_t = sets_of_objects[:, t]
+        id_t = obj_id[:, t] # TODO: to later select sub adj mtrx; not finished yet.
 
         list_e_inter, list_is_object_inter = [], []
         for t_1 in previous_T:
             # Get the previous object set
             O_t_1 = sets_of_objects[:, t_1]
+            id_t_1 = obj_id[:, t_1]
 
             # Create the input to feed!
             input_mlp_inter, is_objects_inter = self.create_input_mlp(O_t_1, O_t, D)
+            id_inter, is_objects_inter_id = self.create_input_mlp(id_t_1, id_t, D)
 
             # Infer the relations
             e = self.mlp_inter(input_mlp_inter)
@@ -94,7 +102,7 @@ class ObjectRelationNetwork(nn.Module):
             is_objects_inter = torch.clamp(torch.sum(is_objects_inter, 1), 0, 1)
             return all_e_inter, is_objects_inter
 
-    def forward(self, sets_of_objects, D, sampling=False):
+    def forward(self, sets_of_objects, D, obj_id=None, sampling=False):
 
         # Number of timesteps
         B, T, K, _ = sets_of_objects.size()
@@ -105,7 +113,7 @@ class ObjectRelationNetwork(nn.Module):
             previous_T = random.sample(range(t), 1) if self.training else list(range(t))
 
             # Infer the relation between the two sets of objects
-            e_t, is_obj = self.compute_O_O_interaction(sets_of_objects, t, previous_T, D, sampling)
+            e_t, is_obj = self.compute_O_O_interaction(sets_of_objects, t, previous_T, D, obj_id, sampling)
 
             # Append
             list_e.append(e_t)
