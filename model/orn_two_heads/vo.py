@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from utils.graph import build_vog
+import pickle
 import pdb
 
 class VO(nn.Module):
@@ -21,6 +22,12 @@ class VO(nn.Module):
       self.A_v2o /= options['nb_obj_classes']
       self.A_o2v = self.A_o2v.to(self.device)
       self.A_v2o = self.A_v2o.to(self.device)
+    elif options['adj_type'] == 'wv':
+      with open('/vision2/u/bingbin/ORN/meta/adjWV.pkl', 'rb') as handle:
+        data = pickle.load(handle)
+      o2v, v2o = data['o2v'], data['v2o']
+      self.A_o2v = torch.Tensor(o2v).to(self.device)
+      self.A_v2o = torch.Tensor(v2o).to(self.device)
     elif options['adj_type'] == 'learned':
       raise NotImplementedError('adj_type == "learned" is not implemented yet. Sorry!! > <')
     else:
@@ -61,12 +68,17 @@ class VO(nn.Module):
     obj_embedded = self.obj_embed(objects_features)
     
     # prepare masked adj matrix
-    pdb.set_trace()
-    expand_to = (B, T, N, self.n_verb_cls, self.n_obj_cls)
-    eid = obj_id_clone.unsqueeze(-2).expand(*expand_to).type(torch.ByteTensor)
-    eA = self.A_o2v.expand(*expand_to)
+    expand_to = (B, T, N, self.n_obj_cls, self.n_verb_cls)
     try:
+      eid = obj_id_clone.unsqueeze(-1).expand(*expand_to).type(torch.ByteTensor)
+      # eA = self.A_o2v.expand(*expand_to)
+      eA = self.A_v2o.expand(*expand_to)
+
       subA = eA[eid].view(B, T, N, self.n_verb_cls)
+      # normalize the sub-adj matrix
+      row_sum = subA.sum(-2, keepdim=True)
+      row_sum[row_sum==0] = 1
+      subA = subA / row_sum
     except:
       pdb.set_trace()
 

@@ -6,7 +6,6 @@ random.seed(95)
 import argparse
 import model.models as models
 from inference import inference
-# import ipdb
 
 if __name__ == '__main__':
     # Possible models
@@ -30,10 +29,11 @@ if __name__ == '__main__':
     parser.add_argument('--use-vo-branch', type=int, default=0,
                         help='Whether to add another branch for verb-object. Diff from GCN.')
     parser.add_argument('--use-obj-rel', type=int, default=1)
+    parser.add_argument('--use-obj-logits', type=int, default=1)
     parser.add_argument('--gcn-version', type=str, choices=['None', 'v1', 'v2'], default='v1')
     parser.add_argument('--use-obj-gcn', type=int, choices=[0,1])
     parser.add_argument('--use-context-gcn', type=int, choices=[0,1])
-    parser.add_argument('--adj-type', type=str, default='uniform', choices=['prior', 'uniform', 'learned'],
+    parser.add_argument('--adj-type', type=str, default='uniform', choices=['prior', 'uniform', 'learned', 'wv'],
                         help="Type of adjacency matrix for GCN. Choose among 'prior', 'uniform', or 'learned'.")
     parser.add_argument('--use-flow', type=int, default=0, help='whether to add a branch for optical flow')
     parser.add_argument('--two-layer-context', type=int, default=0, help='Whether to use 2 layers in the context classification head.')
@@ -83,6 +83,7 @@ if __name__ == '__main__':
     parser.add_argument('--ckpt-name', default='model_best.pth', type=str, help='checkpoint filename (w/o dir path)')
     parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                         help='evaluation mode')
+    parser.add_argument('-s', '--silent', action='store_true', help='Whether to print out options')
     parser.add_argument('--cuda', dest='cuda', action='store_true',
                         help='cuda mode')
     parser.add_argument('--add-background', dest='add_background', action='store_true',
@@ -120,9 +121,10 @@ if __name__ == '__main__':
         options['resume'],
         '{}_gpu{}_task{}.exp'.format(options['machine'], options['gpu_id'], options['task_id']))
 
-    print('\nOptions:')
-    for key in options:
-      print('{}: {}'.format(key, options[key]))
-    print('\n')
+    if not options['silent']:
+      print('\nOptions:')
+      for key in options:
+        print('{}: {}'.format(key, options[key]))
+      print('\n')
 
     inference.main(options)
