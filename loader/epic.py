@@ -20,16 +20,18 @@ class EPIC(VideoDataset):
     Loader for the EPIC dataset
     """
 
-    def __init__(self, options, **kwargs):
+    def __init__(self, options, dataset, **kwargs):
         super().__init__(options, **kwargs)
 
-        self.ts2info_fn = '/vision2/u/bingbin/ORN/meta/ts2info.pkl'
+        self.ts2info_fn = '/vision2/u/bingbin/ORN/meta/ts2info_orn_{}.pkl'.format(dataset)
+        # self.ts2info_fn = '/vision2/u/bingbin/ORN/meta/ts2info.pkl'
         with open(self.ts2info_fn, 'rb') as handle:
           self.ts2info = pickle.load(handle)
 
         # Videos paths
         self.list_video, self.dict_video_length, self.dict_video_label = self.get_videos()
-        print('EPIC dataset: size =', len(self.list_video))
+        if not options['silent']:
+          print('EPIC dataset: size =', len(self.list_video))
 
     def get_videos(self):
         list_video = sorted(self.ts2info.keys())

@@ -53,6 +53,8 @@ def forward_backward(model, input_var, criterion, optimizer=None, device='cpu',
     logits, preds_class_detected_objects, gcn_ids = model(input_var)
 
     # compute loss
+    if preds_class_detected_objects is not None:
+      preds_class_detected_objects = preds_class_detected_objects.view(-1, preds_class_detected_objects.shape[-1])
     loss = criterion((logits, preds_class_detected_objects), [input_var['target'], obj_id], device) # TODO: check criterion
 
     # backward
@@ -191,6 +193,8 @@ def validate(epoch, engine, options, device='cpu'):
     print("")
     with torch.no_grad():
         for i, input in enumerate(data_loader):
+            if i==1:
+              print('Val first iter passed.')
             # measure data loading time
             data_time.update(time.time() - end)
 
@@ -266,7 +270,7 @@ def validate(epoch, engine, options, device='cpu'):
     top1 = int(n_correct) / len(all_gts)
     print('Top1:', top1)
 
-    pdb.set_trace()
+    # pdb.set_trace()
 
     # Pandas frame - good & failure
     df_good = pandas.DataFrame.from_dict(dict_id_good_preds)

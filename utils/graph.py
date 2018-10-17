@@ -122,7 +122,7 @@ def build_graph_from_map(kv_map):
   return adj, keys
 
 
-def build_vog(fnoun='', fverb='', faction='', cwd='', fn2v='', fv2n=''):
+def build_vog(fnoun='', fverb='', faction='', cwd='', fn2v='', fv2n='', verbose=False):
   if not fn2v:
     fn2v = '/sailhome/bingbin/VOG/dataset/EPIC/annotations/noun_to_verbs.pkl'
   if not fv2n:
@@ -132,8 +132,9 @@ def build_vog(fnoun='', fverb='', faction='', cwd='', fn2v='', fv2n=''):
     """
     load nv_map / vn_map from cache
     """
-    print('Loading nv_map from', fn2v)
-    print('Loading vn_map from', fv2n)
+    if verbose:
+      print('Loading nv_map from', fn2v)
+      print('Loading vn_map from', fv2n)
     with open(fn2v, 'rb') as handle:
       nv_map = pickle.load(handle)
     with open(fv2n, 'rb') as handle:
@@ -174,9 +175,9 @@ def build_vog(fnoun='', fverb='', faction='', cwd='', fn2v='', fv2n=''):
         fpkl=to_dir('verb_to_nouns.pkl'))
 
   # verb-object graph
-  return build_vog_from_map(nv_map, vn_map)
+  return build_vog_from_map(nv_map, vn_map, verbose)
 
-def build_vog_from_map(nv_map, vn_map):
+def build_vog_from_map(nv_map, vn_map, verbose=False):
   """
   Build a bipartite verb-object graph:
     connectivities are symmetric (v2o vs o2v) but weighted differently
@@ -206,8 +207,9 @@ def build_vog_from_map(nv_map, vn_map):
   v2o = norm_row_sum(v2o)
 
   # vog: (n_objs+n_verbs) x (n_objs+n_verbs)
-  print('#okeys:', len(okeys))
-  print('#vkeys:', len(vkeys))
+  if verbose:
+    print('#okeys:', len(okeys))
+    print('#vkeys:', len(vkeys))
   keys = okeys + vkeys
   vog = np.zeros((len(keys), len(keys)))
   vog[len(okeys):, :len(okeys)] = o2v

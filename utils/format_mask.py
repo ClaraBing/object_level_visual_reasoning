@@ -6,10 +6,11 @@ import numpy as np
 
 mask_in_dir = '/vision/u/cy3/data/EPIC/sampled/bboxes'
 scores_in_dir = '/vision/u/cy3/data/EPIC/sampled/scores'
-mask_out_dir = '/vision2/u/bingbin/ORN/masks/sampled_1perClip_reformat'
+mask_out_dir = '/vision2/u/bingbin/ORN/masks/sampled_1perClip_reformat_sizeObj'
 if not os.path.exists(mask_out_dir):
   os.makedirs(mask_out_dir, exist_ok=True)
-size_file = '/vision2/u/bingbin/ORN/data/size_dict.pkl'
+# size_file = '/vision2/u/bingbin/ORN/meta/size_dict.pkl'
+size_file = '/vision2/u/bingbin/ORN/meta/size_obj2rgb.pkl'
 
 def reformat():
   size_dict = pickle.load(open(size_file, 'rb'))
@@ -24,7 +25,7 @@ def reformat():
     segms, boxes = mask['segms'], mask['boxes']
     # add size to segms
     # TODO
-    size = size_dict[pid]
+    size = size_dict[pid]['obj_hw']
     mask['segms'] = []
 
     # append scores to boxes
@@ -46,7 +47,8 @@ def get_file_size():
   """
   one-time calculation -- shouldn't need to call multiple times
   """
-  root = '/vision2/u/bingbin/EPIC_KITCHENS_2018/frames_rgb_flow/rgb/train'
+  # root = '/vision2/u/bingbin/EPIC_KITCHENS_2018/frames_rgb_flow/rgb/train'
+  root = '/vision2/u/bingbin/EPIC_KITCHENS_2018/object_detection_images/train'
   size_dict = {}
   for pid_path in glob(os.path.join(root, 'P*')):
     pid = os.path.basename(pid_path)

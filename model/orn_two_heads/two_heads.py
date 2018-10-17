@@ -35,6 +35,7 @@ class TwoHeads(nn.Module):
                  **kwargs):
         super(TwoHeads, self).__init__()
         self.use_obj_rel = options['use_obj_rel']
+        self.use_obj_logits = options['use_obj_logits']
         self.use_vo_branch = options['use_vo_branch']
         self.gcn_version = options['gcn_version']
         self.use_obj_gcn = use_obj_gcn
@@ -93,29 +94,29 @@ class TwoHeads(nn.Module):
         self.size_COCO_object_features = self.size_cnn_features
         if self.use_obj_gcn and self.gcn_version=='v2':
           self.size_COCO_object_features += self.size_mask_embedding
-
+  
         # Prediction of the class of each detected COCO objects (MLP from the pooled features)
         self.COCO_Object_Class_from_Features = Classifier(
             size_input=self.size_COCO_object_features,
             size_output=n_objs)
-
+  
         # Embedding of the binary mask by AutoEncoder
         # Goal -> find the latent space of the shape and location of the objects
         self.Encoder_Binary_Mask = EncoderMLP(input_size=self.size_mask * self.size_mask,
                                               list_hidden_size=[self.size_mask_embedding, self.size_mask_embedding])
-
+  
         # Embedding of the object id
         # Goal -> find the latent space of object id better than just a one hot vector
         input_size = n_objs
         self.Encoder_COCO_Obj_Class = EncoderMLP(input_size=input_size,
                                                  list_hidden_size=[self.size_obj_embedding, self.size_obj_embedding])
-
+  
         # Object Relational Network (ORN) between coco or pixel objects
         if self.use_obj_gcn and self.gcn_version == 'v2':
           size_object = self.size_COCO_object_features + self.size_obj_embedding
         else:
           size_object = self.size_COCO_object_features + self.size_obj_embedding + self.size_mask_embedding
-
+  
         # ORN
         list_size_hidden_layers = [self.size_RN, self.size_RN, self.size_RN]
         if self.use_obj_rel:
@@ -146,6 +147,7 @@ class TwoHeads(nn.Module):
         ## Final classification
         self.fc_classifier_object = nn.Linear(self.size_relation_features, self.num_classes)
         # self.fc_classifier_context = nn.Linear(options['D_verb_embed'], self.num_classes) if self.use_context_gcn else nn.Linear(self.size_cnn_features, self.num_classes)
+
         if self.two_layer_context:
           self.fc_classifier_context = nn.Sequential(
             nn.Linear(self.size_cnn_features, 300),
@@ -173,7 +175,7 @@ class TwoHeads(nn.Module):
         fm = fm.transpose(1, 2)  # (B, T, D, 14, 14)
         B, T, D, W, H = fm.size()
         fm = fm.contiguous().view(B * T, D, W, H)
-        fm_up = F.upsample(fm, size=(self.size_mask, self.size_mask), mode='bilinear', align_corners=True)
+        fm_up = F.interpolate(fm, size=(self.size_mask, self.size_mask), mode='bilinear', align_corners=True)
         fm_up = fm_up.view(B, T, D, self.size_mask, self.size_mask)
         fm_up = fm_up.transpose(1, 2)  # (B, D, T, 28, 28)
 
@@ -420,10 +422,10 @@ class TwoHeads(nn.Module):
 
         # pdb.set_trace()
         # HEADS
-        if 'object' in self.logits_type:
+        if 'object' in self.logits_type or 'vo' in self.logits_type:
             full_objects, object_representation, all_e, preds_class_detected_objects, gcn_ids = self.object_head(fm_objects, masks, obj_id, B=B)
 
-        if 'context' in self.logits_type:
+        if 'context' in self.logits_type or 'vo' in self.logits_type:
             context_representation = self.context_head(fm_context, B=B)
 
         if 'vo' in self.logits_type:
@@ -433,6 +435,8 @@ class TwoHeads(nn.Module):
             flow_representation = self.context_head(fm_flow_context, B=B)
 
         # Final classification
+        if not self.use_obj_logits:
+          object_representation = None
         logits = self.final_classification(context_representation, object_representation, vo_representation)
 
         return logits, preds_class_detected_objects, gcn_ids

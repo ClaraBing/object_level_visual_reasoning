@@ -31,13 +31,14 @@ def resnet_two_heads(options, **kwargs):
                    blocks_2nd_head=blocks_object_head,
                    pooling=pooling, **kwargs)
 
-    print(
-        "*** Backbone: Resnet{} (blocks: {} - pooling: {} - Two heads - blocks 2nd head: {} and fm size 2nd head: {}) ***".format(
-            depth,
-            blocks,
-            pooling,
-            object_head,
-            model.size_fm_2nd_head))
+    if not options['silent']:
+      print(
+          "*** Backbone: Resnet{} (blocks: {} - pooling: {} - Two heads - blocks 2nd head: {} and fm size 2nd head: {}) ***".format(
+              depth,
+              blocks,
+              pooling,
+              object_head,
+              model.size_fm_2nd_head))
 
     # Pretrained from imagenet weights
     model = load_pretrained_2D_weights('resnet{}'.format(depth), model, inflation='center')

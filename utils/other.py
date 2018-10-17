@@ -11,6 +11,7 @@ from utils.meter import *
 import shutil
 import math
 import cv2
+import pdb
 
 
 def load_pickle(file):
@@ -87,7 +88,10 @@ def get_loss_and_metric(options):
     elif options['dataset'] == 'epic' or options['dataset'] == 'feats_epic':
        # TODO: use better metric/loss
         metric = AveragePrecisionMeter
-        loss = CriterionLinearCombination(['ce'], [1.0])
+        if options['loss'] == 'ce+ce':
+          loss = CriterionLinearCombination(['ce', 'ce'], [5.0, 1.0])
+        else:
+          loss = CriterionLinearCombination(['ce'], [1.0])
     else:
         raise NameError
 
@@ -115,7 +119,6 @@ class CriterionLinearCombination(Module):
 
     def forward(self, list_input, list_target, device='cpu'):
         assert len(list_input) == len(list_target)
-        # ipdb.set_trace()
         loss = 0.0
         for i in range(len(self.list_criterion)):
             # Cast depending of the criterion
@@ -123,7 +126,8 @@ class CriterionLinearCombination(Module):
             target_i, input_i = list_target[i], list_input[i]
             if input_i is not None:
                 if isinstance(criterion_i, nn.CrossEntropyLoss):
-                    target_i = target_i.nonzero()[:, 1]
+                    if target_i.dim() == 2:
+                      target_i = target_i.nonzero()[:, 1]
                     target_i = target_i.type(torch.LongTensor)
                 elif isinstance(criterion_i, nn.BCEWithLogitsLoss):
                     target_i = target_i.type(torch.FloatTensor)
@@ -144,14 +148,21 @@ def load_from_dir(model, optimizer, options):
     if options['resume']:
         if os.path.isdir(options['resume']):
             # ckpt_resume = os.path.join(options['resume'], options['ckpt_name'])
-            with open(options['ckpt_file'], 'r') as fin:
-              ckpt_resume = fin.readline().strip()
-              ckpt_resume = os.path.join(options['resume'], ckpt_resume)
+            ckpt_file = options['ckpt_file']
+            if not os.path.exists(ckpt_file):
+              ckpt_resume = 'model_best.pth'
+            else:
+              with open(ckpt_file, 'r') as fin:
+                ckpt_resume = fin.readline().strip()
+
+            ckpt_resume = os.path.join(options['resume'], ckpt_resume)
             if not os.path.isfile(ckpt_resume):
               untarred = ckpt_resume.replace('.tar', '')
               if os.path.isfile(untarred):
                 ckpt_resume = untarred
             if os.path.isfile(ckpt_resume):
+                options['ckpt_resume'] = ckpt_resume
+                
                 print("\n=> loading checkpoint '{}'".format(ckpt_resume))
                 checkpoint = torch.load(ckpt_resume, map_location=lambda storage, loc: storage)
                 epoch = checkpoint['epoch']
@@ -292,7 +303,6 @@ def store_preds(preds, id, list_correct_preds, obj_id, dataset='vlog'):
         id_i = decode_videoId(id_np[i])
 
         # obj id
-        # ipdb.set_trace()
         dict_obj[id_i] = np.round(obj_id_cpu[i].sum(0).sum(0), 2)
 
         # good or failure

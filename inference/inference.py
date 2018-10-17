@@ -27,8 +27,9 @@ def main(options):
 
     # Dataset
     train_dataset, val_dataset, train_loader, val_loader = get_datasets_and_dataloaders(options, device=options['device'])
-    print('\n*** Train set of size {}  -  Val set of size {} ***\n'.format(print_number(len(train_dataset)),
-                                                                           print_number(len(val_dataset))))
+    if not options['silent']:
+      print('\n*** Train set of size {}  -  Val set of size {} ***\n'.format(print_number(len(train_dataset)),
+                                                                             print_number(len(val_dataset))))
 
     # Model
     tmp = models.__dict__[options['arch']]
@@ -121,7 +122,7 @@ def main(options):
                 write_to_log(log_path, train_dataset.dataset, save_dir, epoch, [loss_train, loss_train], None)
     
                 # get the val metric
-                if options['train_set'] == 'train':
+                if options['train_set'] == 'train' and False:
                     # Val
                     loss_val, metric_val, per_class_metric_val, *_ = validate(epoch, engine, options, device=device)
                     # Write into log
